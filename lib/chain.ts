@@ -55,6 +55,7 @@ export interface RelayerStatus {
   address: string;
   balanceEtn: string;
   balanceRaw: string;
+  isCriticalBalance: boolean;
   isLowBalance: boolean;
   evmNonce: number;
   blockNumber: number;
@@ -79,12 +80,14 @@ export async function getRelayerStatus(): Promise<RelayerStatus> {
     const rpcLatencyMs = Date.now() - startTime;
     const balanceEtn = formatEther(balance);
     const balanceNum = parseFloat(balanceEtn);
-    const isLowBalance = balanceNum < 50; // Alert threshold
+    const isCriticalBalance = balanceNum < 10;
+    const isLowBalance = balanceNum < 50;
 
     return {
       address: relayerAddress,
       balanceEtn: balanceNum.toFixed(4),
       balanceRaw: balance.toString(),
+      isCriticalBalance,
       isLowBalance,
       evmNonce,
       blockNumber: Number(blockNumber),
@@ -96,6 +99,7 @@ export async function getRelayerStatus(): Promise<RelayerStatus> {
       address: relayerAddress,
       balanceEtn: "0.0000",
       balanceRaw: "0",
+      isCriticalBalance: true,
       isLowBalance: true,
       evmNonce: 0,
       blockNumber: 0,

@@ -67,6 +67,7 @@ export interface IReceiptDoc {
   paymentMethod: string;
   paymentStatus: string;
   onChainStatus?: "pending" | "anchored" | "failed";
+  onChainTxHash?: string | null;
   items?: Array<{ name: string; quantity: number; unitPrice: number; total: number }>;
   createdAt: Date;
   updatedAt: Date;
@@ -83,6 +84,7 @@ const ReceiptSchema = new Schema<IReceiptDoc>(
     paymentMethod: { type: String, default: "Cash" },
     paymentStatus: { type: String, default: "paid" },
     onChainStatus: { type: String, default: "anchored", index: true },
+    onChainTxHash: { type: String, default: null, index: true },
     items: { type: [Schema.Types.Mixed], default: [] },
   },
   {
@@ -108,6 +110,7 @@ export interface IShipmentDoc {
   status: "Created" | "InTransit" | "Delivered" | "Verified" | "Disputed";
   isDisputed?: boolean;
   onChainStatus?: "pending" | "anchored" | "failed";
+  onChainTxHash?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -120,6 +123,7 @@ const ShipmentSchema = new Schema<IShipmentDoc>(
     status: { type: String, required: true },
     isDisputed: { type: Boolean, default: false },
     onChainStatus: { type: String, default: "anchored", index: true },
+    onChainTxHash: { type: String, default: null, index: true },
   },
   { timestamps: true }
 );

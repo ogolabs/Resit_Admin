@@ -11,6 +11,8 @@ export const QUERY_TIMINGS = {
   RECORDS_STALE_MS: 30 * 1000,
   // Merchant details: cache for 45s
   DETAIL_STALE_MS: 45 * 1000,
+  // Incidents telemetry: cache for 15s
+  INCIDENTS_STALE_MS: 15 * 1000,
   // Cache retention garbage collection: 5 minutes
   GC_TIME_MS: 5 * 60 * 1000,
 } as const;
