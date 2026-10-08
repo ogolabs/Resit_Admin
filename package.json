@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
+    "cobe": "^2.0.1",
+    "country-flag-icons": "^1.6.20",
     "jose": "^6.2.12",
     "lucide-react": "^1.24.0",
     "mongoose": "^9.8.0",
