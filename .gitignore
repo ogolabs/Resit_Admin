@@ -1,0 +1,28 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js build
+/.next/
+/out/
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# Local env files - NEVER COMMIT SECRETS
+.env*.local
+.env
+.env.development
+.env.production
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
