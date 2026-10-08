@@ -17,6 +17,8 @@ import {
   Package,
   Server,
   Building2,
+  CheckCircle2,
+  X,
 } from "lucide-react";
 import { QUERY_TIMINGS } from "@/lib/query-config";
 
@@ -32,6 +34,7 @@ interface IncidentItem {
   amountOrTracking?: string;
   createdAt: string;
   canRetry?: boolean;
+  canResolve?: boolean;
 }
 
 interface IncidentsResponse {
@@ -53,6 +56,8 @@ export default function IncidentsPage() {
   const [categoryFilter, setCategoryFilter] = useState<"all" | "relayer" | "receipt_anchor" | "shipment_dispute">("all");
   const [severityFilter, setSeverityFilter] = useState<"all" | "critical" | "warning">("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [resolveModalItem, setResolveModalItem] = useState<IncidentItem | null>(null);
+  const [resolveNotes, setResolveNotes] = useState("");
 
   const { data, isLoading, isFetching, refetch } = useQuery<IncidentsResponse>({
     queryKey: ["admin-incidents"],
@@ -80,6 +85,36 @@ export default function IncidentsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-incidents"] });
       queryClient.invalidateQueries({ queryKey: ["admin-universal-records"] });
+    },
+  });
+
+  const resolveMutation = useMutation({
+    mutationFn: async ({
+      entityId,
+      category,
+      notes,
+    }: {
+      entityId: string;
+      category: string;
+      notes?: string;
+    }) => {
+      const res = await fetch("/api/incidents/resolve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entityId, category, notes }),
+      });
+      if (!res.ok) {
+        const err = (await res.json()) as { error?: string };
+        throw new Error(err.error || "Resolution failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-incidents"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-universal-records"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
+      setResolveModalItem(null);
+      setResolveNotes("");
     },
   });
 
@@ -314,11 +349,17 @@ export default function IncidentsPage() {
                   {item.entityId && (
                     <div className="flex items-center gap-1 font-mono">
                       <span>ID:</span>
-                      <span className="text-slate-200 select-all">{item.entityId}</span>
+                      <span className="text-slate-200 select-all font-semibold">
+                        {item.amountOrTracking?.startsWith("SHPT-")
+                          ? item.amountOrTracking
+                          : item.entityId.length > 24
+                          ? `${item.entityId.slice(0, 10)}...${item.entityId.slice(-6)}`
+                          : item.entityId}
+                      </span>
                       <button
                         onClick={() => copyToClipboard(item.entityId!)}
                         className="p-0.5 text-slate-500 hover:text-slate-300 cursor-pointer"
-                        title="Copy ID"
+                        title="Copy Raw Identifier"
                       >
                         {copiedId === item.entityId ? (
                           <Check className="w-3 h-3 text-emerald-400" />
@@ -332,11 +373,11 @@ export default function IncidentsPage() {
                   {item.merchantName && (
                     <div className="flex items-center gap-1">
                       <Building2 className="w-3 h-3 text-slate-500" />
-                      <span>{item.merchantName}</span>
+                      <span className="text-slate-300 font-medium">{item.merchantName}</span>
                     </div>
                   )}
 
-                  {item.amountOrTracking && (
+                  {item.amountOrTracking && !item.amountOrTracking.startsWith("SHPT-") && (
                     <span className="font-mono text-slate-300">({item.amountOrTracking})</span>
                   )}
 
@@ -366,20 +407,120 @@ export default function IncidentsPage() {
                   </button>
                 )}
 
-                {item.entityId && (
+                {item.canResolve && item.entityId && (
+                  <button
+                    onClick={() => {
+                      setResolveModalItem(item);
+                      setResolveNotes("");
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-800/80 text-xs font-medium transition-colors cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Resolve</span>
+                  </button>
+                )}
+
+                {item.category === "relayer" ? (
                   <Link
-                    href={`/records?q=${encodeURIComponent(item.entityId)}`}
+                    href="/infrastructure"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium transition-colors"
+                  >
+                    <span>Inspect Infrastructure</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                ) : item.entityId ? (
+                  <Link
+                    href={`/records?q=${encodeURIComponent(item.amountOrTracking?.startsWith("SHPT-") ? item.amountOrTracking : item.entityId)}`}
                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-medium transition-colors"
                   >
                     <span>Inspect</span>
                     <ExternalLink className="w-3 h-3" />
                   </Link>
-                )}
+                ) : null}
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Incident Resolution Modal */}
+      {resolveModalItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 max-w-md w-full space-y-4 shadow-xl overflow-hidden">
+            <div className="flex items-center justify-between gap-3 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-lg bg-emerald-950 text-emerald-400 flex items-center justify-center border border-emerald-800/60 shrink-0">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-white truncate">Resolve Incident Alert</h3>
+                  <p
+                    className="text-[11px] text-slate-400 font-mono truncate max-w-full"
+                    title={resolveModalItem.entityId}
+                  >
+                    {resolveModalItem.entityId}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setResolveModalItem(null)}
+                className="text-slate-500 hover:text-slate-300 p-1 cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Dismissing this incident marks it as reviewed and removes it from the active operator quarantine feed. The package retains its Disputed status for both merchant and customer, as the merchant may need to dispatch a replacement shipment.
+            </p>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-medium text-slate-400 block">
+                Platform Action & Merchant Outreach Notes (Optional)
+              </label>
+              <textarea
+                value={resolveNotes}
+                onChange={(e) => setResolveNotes(e.target.value)}
+                placeholder="e.g. Merchant contacted by platform regarding handover discrepancy; merchant advised to re-dispatch replacement..."
+                rows={3}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition-colors resize-none"
+              />
+            </div>
+
+            {resolveMutation.isError && (
+              <div className="p-2.5 rounded-lg bg-red-950/60 border border-red-800/60 text-xs text-red-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                <span className="truncate">{resolveMutation.error?.message || "Failed to resolve incident"}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setResolveModalItem(null)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={resolveMutation.isPending}
+                onClick={() =>
+                  resolveMutation.mutate({
+                    entityId: resolveModalItem.entityId!,
+                    category: resolveModalItem.category,
+                    notes: resolveNotes,
+                  })
+                }
+                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {resolveMutation.isPending ? "Processing..." : "Confirm Resolution"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

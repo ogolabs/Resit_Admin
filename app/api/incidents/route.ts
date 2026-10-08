@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { connectAdminDb, AdminReceipt, AdminShipment } from "@/lib/db";
+import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
 
 export interface IncidentItem {
@@ -14,6 +14,7 @@ export interface IncidentItem {
   amountOrTracking?: string;
   createdAt: Date;
   canRetry?: boolean;
+  canResolve?: boolean;
 }
 
 export async function GET() {
@@ -97,27 +98,68 @@ export async function GET() {
       });
     }
 
-    // 3. Query Disputed Shipments
+    // 3. Query Disputed Shipments (only active, unresolved disputes)
     const disputedShipments = await AdminShipment.find({
-      $or: [{ status: "Disputed" }, { isDisputed: true }],
+      $and: [
+        { $or: [{ status: "Disputed" }, { isDisputed: true }] },
+        { disputeResolved: { $ne: true } },
+      ],
     })
-      .select("_id shipperAddress trackingCode status isDisputed createdAt")
+      .select("_id shipperAddress trackingCode status isDisputed createdBy metadata createdAt")
       .sort({ createdAt: -1 })
       .limit(25)
       .lean();
 
+    const shippersToLookup = disputedShipments
+      .filter((s) => !s.createdBy?.name && s.shipperAddress)
+      .map((s) => s.shipperAddress.toLowerCase());
+
+    const merchantLookup = new Map<string, string>();
+    if (shippersToLookup.length > 0) {
+      const users = await AdminUser.find({
+        $or: [
+          { _id: { $in: shippersToLookup } },
+          { eoaAddress: { $in: shippersToLookup } },
+          { walletPublicAddress: { $in: shippersToLookup } },
+        ],
+      })
+        .select("_id eoaAddress walletPublicAddress companyName fullName")
+        .lean();
+
+      for (const u of users) {
+        const name = u.companyName || u.fullName;
+        if (name) {
+          if (u._id) merchantLookup.set(u._id.toLowerCase(), name);
+          if (u.eoaAddress) merchantLookup.set(u.eoaAddress.toLowerCase(), name);
+          if (u.walletPublicAddress) merchantLookup.set(u.walletPublicAddress.toLowerCase(), name);
+        }
+      }
+    }
+
     for (const s of disputedShipments) {
+      const tracking =
+        s.trackingCode ||
+        (s._id.startsWith("0x") ? `SHPT-${s._id.slice(2, 14).toUpperCase()}` : s._id);
+
+      const mName =
+        s.createdBy?.name ||
+        merchantLookup.get(s.shipperAddress?.toLowerCase() || "") ||
+        ((s.metadata as Record<string, unknown> | undefined)?.merchantName as string | undefined) ||
+        undefined;
+
       incidents.push({
         id: `inc-ship-${s._id}`,
         category: "shipment_dispute",
         severity: "critical",
         title: "Physical Custody Handover Dispute",
-        description: `Package ${s.trackingCode || s._id} was flagged with a recipient delivery discrepancy.`,
+        description: `Package ${tracking} was flagged with a recipient delivery discrepancy.`,
         entityId: s._id,
         merchantAddress: s.shipperAddress,
-        amountOrTracking: s.trackingCode || "N/A",
+        merchantName: mName,
+        amountOrTracking: tracking,
         createdAt: s.createdAt,
         canRetry: false,
+        canResolve: true,
       });
     }
 

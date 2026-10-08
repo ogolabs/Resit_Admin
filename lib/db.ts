@@ -109,6 +109,16 @@ export interface IShipmentDoc {
   trackingCode?: string;
   status: "Created" | "InTransit" | "Delivered" | "Verified" | "Disputed";
   isDisputed?: boolean;
+  disputeResolved?: boolean;
+  resolvedAt?: Date | null;
+  resolvedBy?: string | null;
+  resolutionNotes?: string | null;
+  createdBy?: {
+    address?: string;
+    name?: string;
+    branchName?: string | null;
+  } | null;
+  metadata?: Record<string, unknown> | null;
   onChainStatus?: "pending" | "anchored" | "failed";
   onChainTxHash?: string | null;
   createdAt: Date;
@@ -122,10 +132,16 @@ const ShipmentSchema = new Schema<IShipmentDoc>(
     trackingCode: { type: String, default: null, index: true },
     status: { type: String, required: true },
     isDisputed: { type: Boolean, default: false },
+    disputeResolved: { type: Boolean, default: false, index: true },
+    resolvedAt: { type: Date, default: null },
+    resolvedBy: { type: String, default: null },
+    resolutionNotes: { type: String, default: null },
+    createdBy: { type: Schema.Types.Mixed, default: null },
+    metadata: { type: Schema.Types.Mixed, default: null },
     onChainStatus: { type: String, default: "anchored", index: true },
     onChainTxHash: { type: String, default: null, index: true },
   },
-  { timestamps: true }
+  { timestamps: true, strict: false }
 );
 
 export interface IUserDoc {
