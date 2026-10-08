@@ -47,7 +47,7 @@ export function getPublicClient() {
   const chain = isTestnet() ? electroneumTestnet : electroneumMainnet;
   return createPublicClient({
     chain,
-    transport: http(undefined, { timeout: 8000 }),
+    transport: http(undefined, { timeout: 8000, retryCount: 3, retryDelay: 500 }),
   });
 }
 
