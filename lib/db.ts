@@ -126,6 +126,8 @@ const ShipmentSchema = new Schema<IShipmentDoc>(
 
 export interface IUserDoc {
   _id: string;
+  eoaAddress?: string;
+  walletPublicAddress?: string;
   fullName: string;
   companyName?: string;
   businessEmail?: string;
@@ -134,14 +136,19 @@ export interface IUserDoc {
   role: "user" | "merchant";
   country?: string;
   currency?: string;
+  plan?: string;
+  operatingMode?: "sales" | "dispatch" | "hybrid" | null;
   subscriptionActive?: boolean;
   isSuspended?: boolean;
+  businessAddress?: string;
   createdAt: Date;
 }
 
 const UserSchema = new Schema<IUserDoc>(
   {
     _id: { type: String, required: true },
+    eoaAddress: { type: String, default: null, lowercase: true, index: true },
+    walletPublicAddress: { type: String, default: null, lowercase: true },
     fullName: { type: String, required: true },
     companyName: { type: String, default: null },
     businessEmail: { type: String, default: null },
@@ -150,8 +157,79 @@ const UserSchema = new Schema<IUserDoc>(
     role: { type: String, default: "user", index: true },
     country: { type: String, default: null },
     currency: { type: String, default: null },
+    plan: { type: String, default: "free" },
+    operatingMode: { type: String, default: null },
     subscriptionActive: { type: Boolean, default: false },
     isSuspended: { type: Boolean, default: false },
+    businessAddress: { type: String, default: null },
+  },
+  { timestamps: true }
+);
+
+export interface IBranchDoc {
+  _id: string;
+  merchantAddress: string;
+  name: string;
+  location?: string | null;
+  phone?: string | null;
+  managedBy?: string | null;
+  managerName?: string | null;
+  managerAddress?: string | null;
+  isDefault?: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const BranchSchema = new Schema<IBranchDoc>(
+  {
+    _id: { type: String, required: true },
+    merchantAddress: { type: String, required: true, lowercase: true, index: true },
+    name: { type: String, required: true },
+    location: { type: String, default: null },
+    phone: { type: String, default: null },
+    managedBy: { type: String, default: null },
+    managerName: { type: String, default: null },
+    managerAddress: { type: String, default: null },
+    isDefault: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+export interface ITeamMemberDoc {
+  _id: string;
+  merchantAddress: string;
+  branchId: string;
+  branchName: string;
+  memberEmail: string;
+  memberPhone?: string | null;
+  memberAddress?: string | null;
+  memberName: string;
+  role: "manager" | "sales_rep";
+  status: "active" | "suspended";
+  invitedBy: string;
+  invitedAt: Date;
+  acceptedAt?: Date | null;
+  suspendedAt?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const TeamMemberSchema = new Schema<ITeamMemberDoc>(
+  {
+    _id: { type: String, required: true },
+    merchantAddress: { type: String, required: true, lowercase: true, index: true },
+    branchId: { type: String, required: true, index: true },
+    branchName: { type: String, required: true },
+    memberEmail: { type: String, required: true, lowercase: true, index: true },
+    memberPhone: { type: String, default: null },
+    memberAddress: { type: String, default: null },
+    memberName: { type: String, required: true },
+    role: { type: String, required: true },
+    status: { type: String, default: "active" },
+    invitedBy: { type: String, required: true },
+    invitedAt: { type: Date, default: Date.now },
+    acceptedAt: { type: Date, default: null },
+    suspendedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -164,3 +242,10 @@ export const AdminShipment: Model<IShipmentDoc> =
 
 export const AdminUser: Model<IUserDoc> =
   mongoose.models.AdminUser || mongoose.model<IUserDoc>("AdminUser", UserSchema, "users");
+
+export const AdminBranch: Model<IBranchDoc> =
+  mongoose.models.AdminBranch || mongoose.model<IBranchDoc>("AdminBranch", BranchSchema, "branches");
+
+export const AdminTeamMember: Model<ITeamMemberDoc> =
+  mongoose.models.AdminTeamMember || mongoose.model<ITeamMemberDoc>("AdminTeamMember", TeamMemberSchema, "teammembers");
+
