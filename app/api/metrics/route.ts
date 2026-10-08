@@ -7,6 +7,8 @@ export async function GET() {
     await connectAdminDb();
 
     // Aggregate GMV and sales totals for issued receipts and voided receipts concurrently
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
     const [
       issuedSalesAgg,
       voidedSalesAgg,
@@ -16,6 +18,7 @@ export async function GET() {
       shipmentCountsByStatus,
       relayerStatus,
       unanchoredCount,
+      activeDisputesCount,
     ] = await Promise.all([
       AdminReceipt.aggregate([
         { $match: { status: { $in: ["Issued", "issued"] } } },
@@ -51,7 +54,23 @@ export async function GET() {
         },
       ]),
       getRelayerStatus(),
-      AdminReceipt.countDocuments({ onChainStatus: { $in: ["pending", "failed"] } }),
+      AdminReceipt.countDocuments({
+        $or: [
+          { onChainStatus: "failed" },
+          { onChainStatus: "pending", createdAt: { $lt: fiveMinutesAgo } },
+          {
+            onChainTxHash: null,
+            status: { $in: ["Issued", "issued"] },
+            createdAt: { $lt: fiveMinutesAgo },
+          },
+        ],
+      }),
+      AdminShipment.countDocuments({
+        $and: [
+          { $or: [{ status: "Disputed" }, { isDisputed: true }] },
+          { disputeResolved: { $ne: true } },
+        ],
+      }),
     ]);
 
     // Format currency sums for issued receipts (Active GMV)
@@ -85,18 +104,19 @@ export async function GET() {
       InTransit: 0,
       Delivered: 0,
       Verified: 0,
-      Disputed: 0,
+      Disputed: activeDisputesCount,
     };
 
     for (const item of shipmentCountsByStatus) {
-      if (item._id && typeof item.count === "number") {
+      if (item._id && typeof item.count === "number" && item._id !== "Disputed") {
         custodyMap[item._id] = item.count;
       }
     }
 
-    // Disputed shipments count
-    const activeDisputes = custodyMap["Disputed"] || 0;
-    const incidentCount = (unanchoredCount > 0 ? 1 : 0) + (activeDisputes > 0 ? activeDisputes : 0);
+    // Evaluate live incident count
+    const relayerBalanceNum = parseFloat(relayerStatus.balanceEtn || "0");
+    const relayerGasIncident = relayerBalanceNum < 50 ? 1 : 0;
+    const totalActiveIncidents = unanchoredCount + activeDisputesCount + relayerGasIncident;
 
     return NextResponse.json({
       success: true,
@@ -128,8 +148,8 @@ export async function GET() {
         unanchoredQueue: unanchoredCount,
       },
       incidents: {
-        activeCount: incidentCount,
-        activeDisputes,
+        activeCount: totalActiveIncidents,
+        activeDisputes: activeDisputesCount,
         unanchoredQueue: unanchoredCount,
       },
       custody: custodyMap,

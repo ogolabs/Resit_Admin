@@ -19,6 +19,7 @@ import { QUERY_TIMINGS } from "@/lib/query-config";
 
 interface UnifiedRecord {
   id: string;
+  rawId?: string;
   recordType: "receipt" | "shipment";
   merchantOrShipper: string;
   merchantName?: string;
@@ -262,6 +263,14 @@ export default function UniversalLedgerPage() {
                           )}
                         </button>
                       </div>
+                      {r.rawId && r.rawId !== r.id && (
+                        <div
+                          className="font-mono text-[10px] text-slate-500 truncate max-w-[150px] mt-0.5"
+                          title={`On-chain Hash: ${r.rawId}`}
+                        >
+                          {r.rawId.slice(0, 8)}...{r.rawId.slice(-6)}
+                        </div>
+                      )}
                     </td>
 
                     {/* Record Type */}
@@ -281,8 +290,8 @@ export default function UniversalLedgerPage() {
 
                     {/* Merchant / Issuer */}
                     <td className="py-3.5 px-4">
-                      <div className="font-medium text-white truncate max-w-[160px]">
-                        {r.merchantName || "Store Account"}
+                      <div className="font-medium text-white truncate max-w-[160px]" title={r.merchantName || undefined}>
+                        {r.merchantName || "Merchant Store"}
                       </div>
                       <div
                         className="font-mono text-[11px] text-slate-400 truncate max-w-[140px] mt-0.5"
@@ -293,8 +302,8 @@ export default function UniversalLedgerPage() {
                     </td>
 
                     {/* Financial / Tracking detail */}
-                    <td className="py-3.5 px-4 font-mono font-medium text-slate-200">
-                      {r.detail}
+                    <td className="py-3.5 px-4 font-medium text-slate-200">
+                      <span className={r.recordType === "receipt" ? "font-mono" : ""}>{r.detail}</span>
                     </td>
 
                     {/* Status */}
