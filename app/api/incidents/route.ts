@@ -184,6 +184,7 @@ export async function GET() {
         info: infoCount,
         stalledReceipts: stalledReceipts.length,
         disputedShipments: disputedShipments.length,
+        relayerGas: relayer.balanceEtn,
         relayerStatus:
           balanceNum < 10
             ? "Critical Fuel (<10 ETN)"

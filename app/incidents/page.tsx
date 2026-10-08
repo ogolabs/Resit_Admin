@@ -132,11 +132,11 @@ export default function IncidentsPage() {
     info: 0,
     stalledReceipts: 0,
     disputedShipments: 0,
-    relayerGas: "0.0000",
+    relayerGas: "",
     relayerStatus: "Operational",
   };
 
-  const relayerGasNum = parseFloat(summary.relayerGas || "0");
+  const relayerGasNum = summary.relayerGas ? parseFloat(summary.relayerGas) : Number.NaN;
 
   const filteredIncidents = incidents.filter((item) => {
     if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
@@ -202,7 +202,7 @@ export default function IncidentsPage() {
       </div>
 
       {/* Relayer Fuel Health Alert Banner */}
-      {relayerGasNum < 10 ? (
+      {!isLoading && data && Number.isFinite(relayerGasNum) && relayerGasNum < 10 ? (
         <div className="p-3.5 rounded-xl bg-rose-950/70 border border-rose-800/80 text-rose-200 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
@@ -219,7 +219,7 @@ export default function IncidentsPage() {
             Inspect Infrastructure
           </Link>
         </div>
-      ) : relayerGasNum < 50 ? (
+      ) : !isLoading && data && Number.isFinite(relayerGasNum) && relayerGasNum < 50 ? (
         <div className="p-3.5 rounded-xl bg-slate-900/80 border border-blue-900/60 text-slate-300 text-xs flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <AlertCircle className="w-4 h-4 text-blue-400 shrink-0" />
