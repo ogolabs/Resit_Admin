@@ -47,6 +47,11 @@ interface MerchantsResponse {
   total: number;
   page: number;
   totalPages: number;
+  summary?: {
+    totalActive: number;
+    totalSuspended: number;
+    totalBranches: number;
+  };
 }
 
 export default function MerchantsPage() {
@@ -71,6 +76,8 @@ export default function MerchantsPage() {
       return res.json();
     },
     staleTime: QUERY_TIMINGS.DIRECTORY_STALE_MS,
+    refetchInterval: 30 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -83,10 +90,10 @@ export default function MerchantsPage() {
   const totalCount = data?.total || 0;
   const totalPages = data?.totalPages || 1;
 
-  // Aggregate high-level stats from current view
-  const activeCount = merchants.filter((m) => !m.isSuspended).length;
-  const suspendedCount = merchants.filter((m) => m.isSuspended).length;
-  const totalBranches = merchants.reduce((acc, m) => acc + m.branchCount, 0);
+  // Aggregate high-level stats from backend global summary with fallback to view
+  const activeCount = data?.summary?.totalActive ?? merchants.filter((m) => !m.isSuspended).length;
+  const suspendedCount = data?.summary?.totalSuspended ?? merchants.filter((m) => m.isSuspended).length;
+  const totalBranches = data?.summary?.totalBranches ?? merchants.reduce((acc, m) => acc + m.branchCount, 0);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">

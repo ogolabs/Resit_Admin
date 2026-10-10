@@ -121,6 +121,11 @@ export interface IShipmentDoc {
   metadata?: Record<string, unknown> | null;
   onChainStatus?: "pending" | "anchored" | "failed";
   onChainTxHash?: string | null;
+  events?: Array<{
+    event?: string;
+    onChainTxHash?: string | null;
+    timestamp?: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }

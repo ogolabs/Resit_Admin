@@ -23,6 +23,7 @@ import { LocationsDistributionCard } from "@/components/dashboard/LocationsDistr
 import { RelayerQuotaCard } from "@/components/dashboard/RelayerQuotaCard";
 import { CustodyDistributionCard } from "@/components/dashboard/CustodyDistributionCard";
 import { RecentAuditFeed } from "@/components/dashboard/RecentAuditFeed";
+import { QUERY_TIMINGS } from "@/lib/query-config";
 
 interface MetricsResponse {
   success: boolean;
@@ -103,8 +104,9 @@ export default function AdminDashboardPage() {
   const { data, isLoading, isFetching, refetch } = useQuery<MetricsResponse>({
     queryKey: ["admin-metrics"],
     queryFn: fetchPlatformMetrics,
-    staleTime: 60 * 1000,
-    refetchOnWindowFocus: false,
+    staleTime: QUERY_TIMINGS.METRICS_STALE_MS,
+    refetchInterval: 15 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   const totalDispatches =

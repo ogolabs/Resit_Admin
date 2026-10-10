@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
+import { getUnanchoredReceiptFilter, healDriftedAnchors } from "@/lib/ledger-queries";
 
 const DEFAULT_CURRENCY_MAP: Record<string, string> = {
   NG: "NGN",
@@ -31,6 +32,7 @@ function getCountryName(code: string): string {
 export async function GET() {
   try {
     await connectAdminDb();
+    void healDriftedAnchors();
 
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -85,17 +87,7 @@ export async function GET() {
         },
       ]),
       getRelayerStatus(),
-      AdminReceipt.countDocuments({
-        $or: [
-          { onChainStatus: "failed" },
-          { onChainStatus: "pending", createdAt: { $lt: fiveMinutesAgo } },
-          {
-            onChainTxHash: null,
-            status: { $in: ["Issued", "issued"] },
-            createdAt: { $lt: fiveMinutesAgo },
-          },
-        ],
-      }),
+      AdminReceipt.countDocuments(getUnanchoredReceiptFilter(fiveMinutesAgo)),
       AdminShipment.countDocuments({
         $and: [
           { $or: [{ status: "Disputed" }, { isDisputed: true }] },
