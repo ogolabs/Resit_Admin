@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment } from "@/lib/db";
+import {
+  getUnanchoredReceiptFilter,
+  getUnanchoredShipmentFilter,
+  healDriftedAnchors,
+} from "@/lib/ledger-queries";
 
 export async function POST() {
   try {
     await connectAdminDb();
+    void healDriftedAnchors();
 
     // Query unanchored items
     const [pendingReceipts, pendingShipments] = await Promise.all([
-      AdminReceipt.find({ onChainStatus: { $in: ["pending", "failed"] } })
+      AdminReceipt.find(getUnanchoredReceiptFilter())
         .limit(20)
         .select("_id receiptNumber onChainStatus"),
-      AdminShipment.find({ onChainStatus: { $in: ["pending", "failed"] } })
+      AdminShipment.find(getUnanchoredShipmentFilter())
         .limit(20)
         .select("_id trackingCode onChainStatus"),
     ]);

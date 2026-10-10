@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
+import {
+  getUnanchoredReceiptFilter,
+  getUnanchoredShipmentFilter,
+  healDriftedAnchors,
+} from "@/lib/ledger-queries";
 
 export async function GET() {
   const startTime = Date.now();
 
   try {
     const mongooseConn = await connectAdminDb();
+    void healDriftedAnchors();
     const dbPingStart = Date.now();
     
     // Quick ping to measure MongoDB round-trip time
@@ -26,9 +32,9 @@ export async function GET() {
       relayer,
     ] = await Promise.all([
       AdminReceipt.countDocuments(),
-      AdminReceipt.countDocuments({ onChainStatus: { $in: ["pending", "failed"] } }),
+      AdminReceipt.countDocuments(getUnanchoredReceiptFilter()),
       AdminShipment.countDocuments(),
-      AdminShipment.countDocuments({ onChainStatus: { $in: ["pending", "failed"] } }),
+      AdminShipment.countDocuments(getUnanchoredShipmentFilter()),
       AdminUser.countDocuments({ role: "merchant" }),
       AdminUser.countDocuments(),
       getRelayerStatus(),

@@ -121,6 +121,11 @@ export interface IShipmentDoc {
   metadata?: Record<string, unknown> | null;
   onChainStatus?: "pending" | "anchored" | "failed";
   onChainTxHash?: string | null;
+  events?: Array<{
+    event?: string;
+    onChainTxHash?: string | null;
+    timestamp?: Date;
+  }>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -140,6 +145,7 @@ const ShipmentSchema = new Schema<IShipmentDoc>(
     metadata: { type: Schema.Types.Mixed, default: null },
     onChainStatus: { type: String, default: "anchored", index: true },
     onChainTxHash: { type: String, default: null, index: true },
+    events: { type: [Schema.Types.Mixed], default: [] },
   },
   { timestamps: true, strict: false }
 );

@@ -43,8 +43,11 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const [total, userDocs] = await Promise.all([
+    const [total, totalActive, totalSuspended, totalBranches, userDocs] = await Promise.all([
       AdminUser.countDocuments(baseFilter),
+      AdminUser.countDocuments({ role: "merchant", isSuspended: { $ne: true } }),
+      AdminUser.countDocuments({ role: "merchant", isSuspended: true }),
+      AdminBranch.countDocuments(),
       AdminUser.find(baseFilter)
         .select("_id eoaAddress fullName companyName businessEmail businessPhone businessHandle country currency plan operatingMode subscriptionActive isSuspended createdAt")
         .sort({ createdAt: -1 })
@@ -138,6 +141,11 @@ export async function GET(req: NextRequest) {
       total,
       page,
       totalPages: Math.ceil(total / limit) || 1,
+      summary: {
+        totalActive,
+        totalSuspended,
+        totalBranches,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error";

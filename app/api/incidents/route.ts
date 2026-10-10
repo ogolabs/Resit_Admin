@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
+import { getUnanchoredReceiptFilter, healDriftedAnchors } from "@/lib/ledger-queries";
 
 export interface IncidentItem {
   id: string;
@@ -64,18 +65,9 @@ export async function GET() {
     }
 
     // 2. Query Unanchored Receipts (> 5 minutes old) or Failed Status
+    void healDriftedAnchors();
     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-    const stalledReceipts = await AdminReceipt.find({
-      $or: [
-        { onChainStatus: "failed" },
-        { onChainStatus: "pending", createdAt: { $lt: fiveMinutesAgo } },
-        {
-          onChainTxHash: null,
-          status: { $in: ["Issued", "issued"] },
-          createdAt: { $lt: fiveMinutesAgo },
-        },
-      ],
-    })
+    const stalledReceipts = await AdminReceipt.find(getUnanchoredReceiptFilter(fiveMinutesAgo))
       .select("_id merchantAddress merchantName total currency status onChainStatus createdAt")
       .sort({ createdAt: -1 })
       .limit(25)

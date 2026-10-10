@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser, IShipmentDoc, IReceiptDoc } from "@/lib/db";
+import {
+  getAnchoredReceiptFilter,
+  getAnchoredShipmentFilter,
+  healDriftedAnchors,
+} from "@/lib/ledger-queries";
 
 export interface UnifiedRecordItem {
   id: string;
@@ -17,6 +22,7 @@ export interface UnifiedRecordItem {
 export async function GET(req: NextRequest) {
   try {
     await connectAdminDb();
+    void healDriftedAnchors();
 
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();
@@ -109,8 +115,8 @@ export async function GET(req: NextRequest) {
       await Promise.all([
         queryReceipts ? AdminReceipt.countDocuments(receiptFilter) : 0,
         queryShipments ? AdminShipment.countDocuments(shipmentFilter) : 0,
-        queryReceipts ? AdminReceipt.countDocuments({ ...receiptFilter, onChainStatus: "anchored" }) : 0,
-        queryShipments ? AdminShipment.countDocuments({ ...shipmentFilter, onChainStatus: "anchored" }) : 0,
+        queryReceipts ? AdminReceipt.countDocuments({ ...receiptFilter, ...getAnchoredReceiptFilter() }) : 0,
+        queryShipments ? AdminShipment.countDocuments({ ...shipmentFilter, ...getAnchoredShipmentFilter() }) : 0,
         queryReceipts ? AdminReceipt.countDocuments({ ...receiptFilter, status: { $in: ["Voided", "voided"] } }) : 0,
         queryShipments ? AdminShipment.countDocuments({ ...shipmentFilter, $or: [{ status: "Disputed" }, { isDisputed: true }] }) : 0,
       ]);
@@ -124,7 +130,7 @@ export async function GET(req: NextRequest) {
 
     if (recordType === "receipts") {
       const rawReceipts = await AdminReceipt.find(receiptFilter)
-        .select("_id merchantAddress merchantName businessName total currency status onChainStatus createdAt")
+        .select("_id merchantAddress merchantName businessName total currency status onChainStatus onChainTxHash createdAt")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -135,7 +141,7 @@ export async function GET(req: NextRequest) {
       paginated = receipts.map((r) => mapReceiptRecord(r, merchantLookup));
     } else if (recordType === "shipments") {
       const rawShipments = await AdminShipment.find(shipmentFilter)
-        .select("_id shipperAddress trackingCode status isDisputed createdBy metadata onChainStatus createdAt")
+        .select("_id shipperAddress trackingCode status isDisputed createdBy metadata onChainStatus onChainTxHash events createdAt")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -149,12 +155,12 @@ export async function GET(req: NextRequest) {
       const fetchDepth = skip + limit;
       const [rawReceipts, rawShipments] = await Promise.all([
         AdminReceipt.find(receiptFilter)
-          .select("_id merchantAddress merchantName businessName total currency status onChainStatus createdAt")
+          .select("_id merchantAddress merchantName businessName total currency status onChainStatus onChainTxHash createdAt")
           .sort({ createdAt: -1 })
           .limit(fetchDepth)
           .lean(),
         AdminShipment.find(shipmentFilter)
-          .select("_id shipperAddress trackingCode status isDisputed createdBy metadata onChainStatus createdAt")
+          .select("_id shipperAddress trackingCode status isDisputed createdBy metadata onChainStatus onChainTxHash events createdAt")
           .sort({ createdAt: -1 })
           .limit(fetchDepth)
           .lean(),
@@ -235,6 +241,11 @@ function mapReceiptRecord(
     r.merchantName ||
     undefined;
 
+  const isAnchored = Boolean(
+    r.onChainStatus === "anchored" ||
+      (typeof r.onChainTxHash === "string" && r.onChainTxHash.startsWith("0x"))
+  );
+
   return {
     id: r._id,
     rawId: r._id,
@@ -244,7 +255,7 @@ function mapReceiptRecord(
     detail: `${r.currency || "NGN"} ${r.total.toLocaleString()}`,
     status: isVoided ? "Voided" : "Issued",
     isVoidedOrDisputed: isVoided,
-    onChainStatus: r.onChainStatus || "anchored",
+    onChainStatus: isAnchored ? "anchored" : (r.onChainStatus || "pending"),
     createdAt: r.createdAt,
   };
 }
@@ -280,6 +291,17 @@ function mapShipmentRecord(
     detail = "Tracked Parcel";
   }
 
+  const hasEventTx = Boolean(
+    s.events?.some(
+      (e) => typeof e?.onChainTxHash === "string" && e.onChainTxHash.startsWith("0x")
+    )
+  );
+  const isAnchored = Boolean(
+    s.onChainStatus === "anchored" ||
+      (typeof s.onChainTxHash === "string" && s.onChainTxHash.startsWith("0x")) ||
+      hasEventTx
+  );
+
   return {
     id: normalId,
     rawId: s._id,
@@ -289,7 +311,7 @@ function mapShipmentRecord(
     detail,
     status: s.status,
     isVoidedOrDisputed: isDisputed,
-    onChainStatus: s.onChainStatus || "anchored",
+    onChainStatus: isAnchored ? "anchored" : (s.onChainStatus || "pending"),
     createdAt: s.createdAt,
   };
 }

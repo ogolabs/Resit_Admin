@@ -23,7 +23,7 @@ export function createAdminQueryClient() {
       queries: {
         staleTime: QUERY_TIMINGS.METRICS_STALE_MS,
         gcTime: QUERY_TIMINGS.GC_TIME_MS,
-        refetchOnWindowFocus: false,
+        refetchOnWindowFocus: true,
         retry: 2,
       },
     },
