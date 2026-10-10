@@ -291,11 +291,15 @@ function mapShipmentRecord(
     detail = "Tracked Parcel";
   }
 
-  const firstEventTx = s.events?.[0]?.onChainTxHash;
+  const hasEventTx = Boolean(
+    s.events?.some(
+      (e) => typeof e?.onChainTxHash === "string" && e.onChainTxHash.startsWith("0x")
+    )
+  );
   const isAnchored = Boolean(
     s.onChainStatus === "anchored" ||
       (typeof s.onChainTxHash === "string" && s.onChainTxHash.startsWith("0x")) ||
-      (typeof firstEventTx === "string" && firstEventTx.startsWith("0x"))
+      hasEventTx
   );
 
   return {

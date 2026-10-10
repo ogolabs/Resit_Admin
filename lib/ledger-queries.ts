@@ -51,52 +51,38 @@ export function getAnchoredReceiptFilter(): Record<string, unknown> {
 
 /**
  * Filter for shipments that have NOT yet been anchored on the Electroneum blockchain.
- * Checks both root onChainTxHash and first dispatch event (events.0.onChainTxHash).
+ * Matches shipments that are not marked as anchored, have no root onChainTxHash,
+ * and have no event containing a valid 0x on-chain transaction hash.
  */
 export function getUnanchoredShipmentFilter(olderThan?: Date): Record<string, unknown> {
-  const missingTxHash = {
-    $and: [
-      {
-        $or: [
-          { onChainTxHash: null },
-          { onChainTxHash: { $exists: false } },
-          { onChainTxHash: "" },
-        ],
-      },
-      {
-        $or: [
-          { "events.0.onChainTxHash": null },
-          { "events.0.onChainTxHash": { $exists: false } },
-          { "events.0.onChainTxHash": "" },
-        ],
-      },
-    ],
+  const unanchoredCondition: Record<string, unknown> = {
+    onChainStatus: { $ne: "anchored" },
+    onChainTxHash: { $not: /^0x/i },
+    "events.onChainTxHash": { $not: /^0x/i },
+    status: { $ne: "Disputed" },
   };
 
   if (olderThan) {
     return {
-      $and: [
-        missingTxHash,
-        { createdAt: { $lt: olderThan } },
-        { status: { $ne: "Disputed" } },
-      ],
+      ...unanchoredCondition,
+      createdAt: { $lt: olderThan },
     };
   }
 
-  return {
-    $and: [missingTxHash, { status: { $ne: "Disputed" } }],
-  };
+  return unanchoredCondition;
 }
 
 /**
  * Filter for shipments that are cryptographically anchored on the Electroneum blockchain.
+ * Matches either explicit onChainStatus "anchored" OR any verified 0x... on-chain transaction
+ * hash at root or within any dispatch/transit/delivery event.
  */
 export function getAnchoredShipmentFilter(): Record<string, unknown> {
   return {
     $or: [
       { onChainStatus: "anchored" },
-      { onChainTxHash: { $exists: true, $ne: null, $nin: ["", null], $regex: /^0x/i } },
-      { "events.0.onChainTxHash": { $exists: true, $ne: null, $nin: ["", null], $regex: /^0x/i } },
+      { onChainTxHash: { $regex: /^0x/i } },
+      { "events.onChainTxHash": { $regex: /^0x/i } },
     ],
   };
 }
@@ -119,8 +105,8 @@ export async function healDriftedAnchors(): Promise<void> {
       AdminShipment.updateMany(
         {
           $or: [
-            { onChainTxHash: { $exists: true, $ne: null, $regex: /^0x/i } },
-            { "events.0.onChainTxHash": { $exists: true, $ne: null, $regex: /^0x/i } },
+            { onChainTxHash: { $regex: /^0x/i } },
+            { "events.onChainTxHash": { $regex: /^0x/i } },
           ],
           onChainStatus: { $ne: "anchored" },
         },

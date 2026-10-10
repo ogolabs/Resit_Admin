@@ -145,6 +145,7 @@ const ShipmentSchema = new Schema<IShipmentDoc>(
     metadata: { type: Schema.Types.Mixed, default: null },
     onChainStatus: { type: String, default: "anchored", index: true },
     onChainTxHash: { type: String, default: null, index: true },
+    events: { type: [Schema.Types.Mixed], default: [] },
   },
   { timestamps: true, strict: false }
 );
