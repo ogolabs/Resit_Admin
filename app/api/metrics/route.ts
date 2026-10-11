@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
-import { getUnanchoredReceiptFilter, healDriftedAnchors } from "@/lib/ledger-queries";
+import {
+  getUnanchoredReceiptFilter,
+  getUnanchoredShipmentFilter,
+  healDriftedAnchors,
+} from "@/lib/ledger-queries";
 
 const DEFAULT_CURRENCY_MAP: Record<string, string> = {
   NG: "NGN",
@@ -45,7 +49,8 @@ export async function GET() {
       merchantCount,
       shipmentCountsByStatus,
       relayerStatus,
-      unanchoredCount,
+      unanchoredReceiptCount,
+      unanchoredShipmentCount,
       activeDisputesCount,
       dailyReceiptsAgg,
       dailyShipmentsAgg,
@@ -88,6 +93,7 @@ export async function GET() {
       ]),
       getRelayerStatus(),
       AdminReceipt.countDocuments(getUnanchoredReceiptFilter(fiveMinutesAgo)),
+      AdminShipment.countDocuments(getUnanchoredShipmentFilter(fiveMinutesAgo)),
       AdminShipment.countDocuments({
         $and: [
           { $or: [{ status: "Disputed" }, { isDisputed: true }] },
@@ -181,6 +187,7 @@ export async function GET() {
     }
 
     // Evaluate live incident count
+    const unanchoredCount = unanchoredReceiptCount + unanchoredShipmentCount;
     const relayerBalanceNum = parseFloat(relayerStatus.balanceEtn || "0");
     const relayerGasIncident = relayerBalanceNum < 50 ? 1 : 0;
     const totalActiveIncidents = unanchoredCount + activeDisputesCount + relayerGasIncident;
@@ -336,12 +343,16 @@ export async function GET() {
         isLowBalance: relayerStatus.isLowBalance,
         balanceEtn: relayerStatus.balanceEtn,
         unanchoredQueue: unanchoredCount,
+        unanchoredReceipts: unanchoredReceiptCount,
+        unanchoredShipments: unanchoredShipmentCount,
         network: relayerStatus.network,
       },
       incidents: {
         activeCount: totalActiveIncidents,
         activeDisputes: activeDisputesCount,
         unanchoredQueue: unanchoredCount,
+        unanchoredReceipts: unanchoredReceiptCount,
+        unanchoredShipments: unanchoredShipmentCount,
       },
       custody: custodyMap,
       dailyActivity,

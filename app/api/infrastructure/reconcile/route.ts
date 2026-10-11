@@ -31,12 +31,27 @@ export async function POST() {
       const internalRes = await fetch(`${frontendBaseUrl}/api/v1/relayer/reconcile?limit=25`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(15_000),
       });
       if (internalRes.ok) {
         reconcilerReport = await internalRes.json();
       }
     } catch {
-      // Reconciler endpoint may be in a different process or port
+      // If primary configured URL failed or timed out and wasn't localhost:3000, attempt localhost fallback
+      if (frontendBaseUrl !== "http://localhost:3000") {
+        try {
+          const fallbackRes = await fetch("http://localhost:3000/api/v1/relayer/reconcile?limit=25", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: AbortSignal.timeout(15_000),
+          });
+          if (fallbackRes.ok) {
+            reconcilerReport = await fallbackRes.json();
+          }
+        } catch {
+          // Reconciler endpoint may be in a separate process or port
+        }
+      }
     }
 
     return NextResponse.json({

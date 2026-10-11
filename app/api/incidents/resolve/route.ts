@@ -111,6 +111,33 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (category === "shipment_anchor") {
+      const cleanEntityId = entityId.trim();
+      const updateResult = await AdminShipment.updateOne(
+        {
+          $or: [
+            { _id: cleanEntityId },
+            { _id: cleanEntityId.toLowerCase() },
+            { trackingCode: cleanEntityId.toUpperCase() },
+          ],
+        },
+        {
+          $set: {
+            onChainStatus: "anchored",
+          },
+        }
+      );
+
+      if (updateResult.matchedCount === 0) {
+        return NextResponse.json({ error: "Shipment record not found in ledger" }, { status: 404 });
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `Shipment ${cleanEntityId} anchor issue marked as resolved.`,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: `Incident ${entityId} resolved by operator.`,

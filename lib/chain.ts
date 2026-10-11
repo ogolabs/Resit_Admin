@@ -8,7 +8,7 @@ export const electroneumMainnet = defineChain({
     default: {
       http: [
         "https://rpc.electroneum.com",
-        "https://rpc.ankr.com/electroneum",
+        `https://rpc.ankr.com/electroneum/${process.env.ANKR_API_KEY}`,
       ],
     },
   },
@@ -27,7 +27,7 @@ export const electroneumTestnet = defineChain({
   rpcUrls: {
     default: {
       http: [
-        "https://rpc.ankr.com/electroneum_testnet",
+        `https://rpc.ankr.com/electroneum_testnet/${process.env.ANKR_API_KEY}`,
       ],
     },
   },

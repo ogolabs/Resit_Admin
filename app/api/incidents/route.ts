@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
-import { getUnanchoredReceiptFilter, healDriftedAnchors } from "@/lib/ledger-queries";
+import {
+  getUnanchoredReceiptFilter,
+  getUnanchoredShipmentFilter,
+  healDriftedAnchors,
+} from "@/lib/ledger-queries";
 
 export interface IncidentItem {
   id: string;
-  category: "relayer" | "receipt_anchor" | "shipment_dispute";
+  category: "relayer" | "receipt_anchor" | "shipment_anchor" | "shipment_dispute";
   severity: "critical" | "warning" | "info";
   title: string;
   description: string;
@@ -90,7 +94,41 @@ export async function GET() {
       });
     }
 
-    // 3. Query Disputed Shipments (only active, unresolved disputes)
+    // 3. Query Unanchored Shipments (> 5 minutes old) or Failed Status
+    const stalledShipments = await AdminShipment.find(getUnanchoredShipmentFilter(fiveMinutesAgo))
+      .select("_id shipperAddress trackingCode status onChainStatus createdBy metadata createdAt")
+      .sort({ createdAt: -1 })
+      .limit(25)
+      .lean();
+
+    for (const s of stalledShipments) {
+      const isFailed = s.onChainStatus === "failed";
+      const tracking =
+        s.trackingCode ||
+        (s._id.startsWith("0x") ? `SHPT-${s._id.slice(2, 14).toUpperCase()}` : s._id);
+
+      const mName =
+        s.createdBy?.name ||
+        ((s.metadata as Record<string, unknown> | undefined)?.merchantName as string | undefined) ||
+        undefined;
+
+      incidents.push({
+        id: `inc-ship-anchor-${s._id}`,
+        category: "shipment_anchor",
+        severity: isFailed ? "critical" : "warning",
+        title: isFailed ? "Shipment Anchor Reverted" : "Shipment Anchor Delayed",
+        description: `Package ${tracking} created at store has no verified on-chain confirmation hash after 5+ minutes.`,
+        entityId: s._id,
+        merchantAddress: s.shipperAddress,
+        merchantName: mName,
+        amountOrTracking: tracking,
+        createdAt: s.createdAt,
+        canRetry: true,
+        canResolve: false,
+      });
+    }
+
+    // 4. Query Disputed Shipments (only active, unresolved disputes)
     const disputedShipments = await AdminShipment.find({
       $and: [
         { $or: [{ status: "Disputed" }, { isDisputed: true }] },
@@ -175,6 +213,7 @@ export async function GET() {
         warning: warningCount,
         info: infoCount,
         stalledReceipts: stalledReceipts.length,
+        stalledShipments: stalledShipments.length,
         disputedShipments: disputedShipments.length,
         relayerGas: relayer.balanceEtn,
         relayerStatus:

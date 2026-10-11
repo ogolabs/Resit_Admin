@@ -24,7 +24,7 @@ import { QUERY_TIMINGS } from "@/lib/query-config";
 
 interface IncidentItem {
   id: string;
-  category: "relayer" | "receipt_anchor" | "shipment_dispute";
+  category: "relayer" | "receipt_anchor" | "shipment_anchor" | "shipment_dispute";
   severity: "critical" | "warning" | "info";
   title: string;
   description: string;
@@ -45,6 +45,7 @@ interface IncidentsResponse {
     warning: number;
     info: number;
     stalledReceipts: number;
+    stalledShipments: number;
     disputedShipments: number;
     relayerGas: string;
     relayerStatus: string;
@@ -53,7 +54,9 @@ interface IncidentsResponse {
 
 export default function IncidentsPage() {
   const queryClient = useQueryClient();
-  const [categoryFilter, setCategoryFilter] = useState<"all" | "relayer" | "receipt_anchor" | "shipment_dispute">("all");
+  const [categoryFilter, setCategoryFilter] = useState<
+    "all" | "relayer" | "receipt_anchor" | "shipment_anchor" | "shipment_dispute"
+  >("all");
   const [severityFilter, setSeverityFilter] = useState<"all" | "critical" | "warning">("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [resolveModalItem, setResolveModalItem] = useState<IncidentItem | null>(null);
@@ -133,6 +136,7 @@ export default function IncidentsPage() {
     warning: 0,
     info: 0,
     stalledReceipts: 0,
+    stalledShipments: 0,
     disputedShipments: 0,
     relayerGas: "",
     relayerStatus: "Operational",
@@ -173,7 +177,7 @@ export default function IncidentsPage() {
       </div>
 
       {/* Summary Metrics Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-3 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800">
           <span className="text-[11px] font-medium text-slate-400 block mb-1">Active Incidents</span>
           <div className="text-lg sm:text-xl font-bold text-white font-mono">
@@ -192,6 +196,13 @@ export default function IncidentsPage() {
           <span className="text-[11px] font-medium text-slate-400 block mb-1">Stalled Receipts</span>
           <div className="text-lg sm:text-xl font-bold text-blue-400 font-mono">
             {isLoading ? "..." : summary.stalledReceipts}
+          </div>
+        </div>
+
+        <div className="p-3 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <span className="text-[11px] font-medium text-slate-400 block mb-1">Stalled Shipments</span>
+          <div className="text-lg sm:text-xl font-bold text-cyan-400 font-mono">
+            {isLoading ? "..." : summary.stalledShipments || 0}
           </div>
         </div>
 
@@ -248,6 +259,7 @@ export default function IncidentsPage() {
             [
               { id: "all", label: "All Items" },
               { id: "receipt_anchor", label: "Stalled Receipts" },
+              { id: "shipment_anchor", label: "Stalled Shipments" },
               { id: "shipment_dispute", label: "Disputes" },
               { id: "relayer", label: "Relayer Gas" },
             ] as const
@@ -337,6 +349,7 @@ export default function IncidentsPage() {
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-slate-400 bg-slate-800/80">
                     {item.category === "relayer" && <Server className="w-3 h-3 text-emerald-400" />}
                     {item.category === "receipt_anchor" && <Receipt className="w-3 h-3 text-blue-400" />}
+                    {item.category === "shipment_anchor" && <Package className="w-3 h-3 text-cyan-400" />}
                     {item.category === "shipment_dispute" && <Package className="w-3 h-3 text-purple-400" />}
                     <span className="capitalize">{item.category.replace("_", " ")}</span>
                   </span>
