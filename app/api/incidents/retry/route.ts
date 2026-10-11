@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { connectAdminDb, AdminReceipt } from "@/lib/db";
+import { connectAdminDb, AdminReceipt, AdminShipment } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,6 +25,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         message: `Receipt ${entityId} status reset to 'pending' for immediate re-anchoring.`,
+      });
+    }
+
+    if (category === "shipment_anchor") {
+      const shipment = await AdminShipment.findById(entityId);
+      if (!shipment) {
+        return NextResponse.json({ error: "Shipment record not found" }, { status: 404 });
+      }
+
+      // Reset to pending so write-behind worker picks it up
+      shipment.onChainStatus = "pending";
+      await shipment.save();
+
+      return NextResponse.json({
+        success: true,
+        message: `Shipment ${entityId} status reset to 'pending' for immediate re-anchoring.`,
       });
     }
 
