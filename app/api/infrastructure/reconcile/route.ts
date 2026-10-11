@@ -23,12 +23,19 @@ export async function POST() {
 
     const totalIdentified = pendingReceipts.length + pendingShipments.length;
 
-    // Optional: Call the internal frontend reconcile endpoint if accessible
-    const frontendBaseUrl = process.env.FRONTEND_INTERNAL_URL || "http://localhost:3000";
+    // In development mode, prioritize local frontend dev server (port 3000)
+    const isDev = process.env.NODE_ENV === "development";
+    const primaryUrl = isDev
+      ? "http://localhost:3000"
+      : process.env.FRONTEND_INTERNAL_URL || "http://localhost:3000";
+    const fallbackUrl = isDev
+      ? process.env.FRONTEND_INTERNAL_URL || null
+      : "http://localhost:3000";
+
     let reconcilerReport = null;
 
     try {
-      const internalRes = await fetch(`${frontendBaseUrl}/api/v1/relayer/reconcile?limit=25`, {
+      const internalRes = await fetch(`${primaryUrl}/api/v1/relayer/reconcile?limit=25`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(15_000),
@@ -37,10 +44,9 @@ export async function POST() {
         reconcilerReport = await internalRes.json();
       }
     } catch {
-      // If primary configured URL failed or timed out and wasn't localhost:3000, attempt localhost fallback
-      if (frontendBaseUrl !== "http://localhost:3000") {
+      if (fallbackUrl && fallbackUrl !== primaryUrl) {
         try {
-          const fallbackRes = await fetch("http://localhost:3000/api/v1/relayer/reconcile?limit=25", {
+          const fallbackRes = await fetch(`${fallbackUrl}/api/v1/relayer/reconcile?limit=25`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             signal: AbortSignal.timeout(15_000),
