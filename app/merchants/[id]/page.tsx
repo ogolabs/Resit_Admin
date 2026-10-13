@@ -22,6 +22,8 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { QUERY_TIMINGS } from "@/lib/query-config";
+import type { IMerchantVerification, IBankDetails } from "@/lib/db";
+import MerchantVerificationTab from "@/components/merchants/MerchantVerificationTab";
 
 interface MerchantDetailResponse {
   merchant: {
@@ -39,6 +41,11 @@ interface MerchantDetailResponse {
     operatingMode: string;
     subscriptionActive: boolean;
     isSuspended: boolean;
+    taxId?: string | null;
+    isEmailVerified?: boolean;
+    isPhoneVerified?: boolean;
+    verification?: IMerchantVerification | null;
+    bankDetails?: IBankDetails | null;
     createdAt: string;
   };
   stats: {
@@ -99,7 +106,7 @@ export default function MerchantDetailPage() {
   const queryClient = useQueryClient();
   const merchantId = params.id as string;
 
-  const [activeTab, setActiveTab] = useState<"branches" | "team" | "receipts" | "shipments">("branches");
+  const [activeTab, setActiveTab] = useState<"verification" | "branches" | "team" | "receipts" | "shipments">("verification");
   const [suspendModalOpen, setSuspendModalOpen] = useState(false);
 
   const { data, isLoading, isFetching, refetch } = useQuery<MerchantDetailResponse>({
@@ -165,6 +172,24 @@ export default function MerchantDetailPage() {
   const { merchant, stats, branches, teamMembers, recentReceipts, recentShipments } = data;
   const isSuspended = merchant.isSuspended;
 
+  const isBankVerified = Boolean(
+    merchant.bankDetails?.isVerified ||
+    (merchant.bankDetails?.accountNumber && merchant.country !== "NG") ||
+    (merchant.bankDetails?.iban && merchant.country !== "NG")
+  );
+  const isBusinessVerified = merchant.verification?.status === "verified";
+  const effectiveTaxId = merchant.taxId || merchant.verification?.tinNumber || null;
+  const isTaxVerified = Boolean(effectiveTaxId);
+
+  let currentTier = 0;
+  if (isBusinessVerified && isTaxVerified) {
+    currentTier = 3;
+  } else if (isBusinessVerified) {
+    currentTier = 2;
+  } else if (isBankVerified) {
+    currentTier = 1;
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
       {/* Navigation & Header */}
@@ -177,7 +202,7 @@ export default function MerchantDetailPage() {
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Merchant Directory</span>
           </Link>
-          <div className="flex items-center gap-3 pt-1">
+          <div className="flex items-center gap-2 sm:gap-3 pt-1 flex-wrap">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
               {merchant.companyName}
             </h1>
@@ -190,6 +215,28 @@ export default function MerchantDetailPage() {
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Active Store
+              </span>
+            )}
+
+            {currentTier === 3 ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Tier 3 Verified
+              </span>
+            ) : currentTier === 2 ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-950/80 text-blue-300 border border-blue-800/60">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Tier 2 Verified
+              </span>
+            ) : currentTier === 1 ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                Tier 1 (Bank)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                Unverified
               </span>
             )}
           </div>
@@ -305,10 +352,22 @@ export default function MerchantDetailPage() {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="border-b border-slate-800 flex items-center gap-2">
+      <div className="border-b border-slate-800 flex items-center gap-2 overflow-x-auto">
+        <button
+          onClick={() => setActiveTab("verification")}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer shrink-0 ${
+            activeTab === "verification"
+              ? "border-blue-500 text-white"
+              : "border-transparent text-slate-400 hover:text-slate-200"
+          }`}
+        >
+          <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+          <span>Compliance & KYB</span>
+        </button>
+
         <button
           onClick={() => setActiveTab("branches")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer shrink-0 ${
             activeTab === "branches"
               ? "border-blue-500 text-white"
               : "border-transparent text-slate-400 hover:text-slate-200"
@@ -320,7 +379,7 @@ export default function MerchantDetailPage() {
 
         <button
           onClick={() => setActiveTab("team")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer shrink-0 ${
             activeTab === "team"
               ? "border-blue-500 text-white"
               : "border-transparent text-slate-400 hover:text-slate-200"
@@ -332,7 +391,7 @@ export default function MerchantDetailPage() {
 
         <button
           onClick={() => setActiveTab("receipts")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer shrink-0 ${
             activeTab === "receipts"
               ? "border-blue-500 text-white"
               : "border-transparent text-slate-400 hover:text-slate-200"
@@ -344,7 +403,7 @@ export default function MerchantDetailPage() {
 
         <button
           onClick={() => setActiveTab("shipments")}
-          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer ${
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors cursor-pointer shrink-0 ${
             activeTab === "shipments"
               ? "border-blue-500 text-white"
               : "border-transparent text-slate-400 hover:text-slate-200"
@@ -357,6 +416,23 @@ export default function MerchantDetailPage() {
 
       {/* Tab Panels */}
       <div className="bg-slate-900/60 rounded-xl border border-slate-800 overflow-hidden">
+        {/* Compliance & KYB Tab */}
+        {activeTab === "verification" && (
+          <MerchantVerificationTab
+            merchantId={merchant.id}
+            country={merchant.country}
+            isEmailVerified={merchant.isEmailVerified}
+            isPhoneVerified={merchant.isPhoneVerified}
+            taxId={merchant.taxId}
+            verification={merchant.verification}
+            bankDetails={merchant.bankDetails}
+            onStatusUpdated={() => {
+              queryClient.invalidateQueries({ queryKey: ["admin-merchant-detail", merchantId] });
+              queryClient.invalidateQueries({ queryKey: ["admin-merchants"] });
+            }}
+          />
+        )}
+
         {/* Branches Tab */}
         {activeTab === "branches" && (
           <div className="p-4">
