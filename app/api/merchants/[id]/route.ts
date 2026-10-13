@@ -115,6 +115,11 @@ export async function GET(
         operatingMode: user.operatingMode || "hybrid",
         subscriptionActive: Boolean(user.subscriptionActive),
         isSuspended: Boolean(user.isSuspended),
+        taxId: user.taxId || null,
+        isEmailVerified: Boolean(user.isEmailVerified),
+        isPhoneVerified: Boolean(user.isPhoneVerified),
+        verification: user.verification || null,
+        bankDetails: user.bankDetails || null,
         createdAt: user.createdAt,
       },
       stats: {
@@ -184,10 +189,41 @@ export async function PATCH(
     const { id } = await params;
     const decodedId = decodeURIComponent(id).trim();
 
-    const body = (await req.json()) as { isSuspended?: boolean };
-    if (typeof body.isSuspended !== "boolean") {
+    const body = (await req.json()) as {
+      isSuspended?: boolean;
+      verificationStatus?: "verified" | "rejected" | "pending" | "unverified";
+      rejectionReason?: string;
+    };
+
+    const updateFields: Record<string, unknown> = {};
+
+    if (typeof body.isSuspended === "boolean") {
+      updateFields.isSuspended = body.isSuspended;
+    }
+
+    if (body.verificationStatus) {
+      const validStatuses = ["verified", "rejected", "pending", "unverified"];
+      if (!validStatuses.includes(body.verificationStatus)) {
+        return NextResponse.json(
+          { error: "Invalid verificationStatus. Must be 'verified', 'rejected', 'pending', or 'unverified'" },
+          { status: 400 }
+        );
+      }
+
+      updateFields["verification.status"] = body.verificationStatus;
+      if (body.verificationStatus === "verified") {
+        updateFields["verification.verifiedAt"] = new Date();
+        updateFields["verification.rejectionReason"] = null;
+      } else if (body.verificationStatus === "rejected") {
+        updateFields["verification.rejectionReason"] = body.rejectionReason || "Verification rejected by compliance administrator";
+      } else {
+        updateFields["verification.rejectionReason"] = null;
+      }
+    }
+
+    if (Object.keys(updateFields).length === 0) {
       return NextResponse.json(
-        { error: "Field 'isSuspended' must be a boolean" },
+        { error: "No valid update fields provided (expected 'isSuspended' or 'verificationStatus')" },
         { status: 400 }
       );
     }
@@ -199,7 +235,7 @@ export async function PATCH(
           { eoaAddress: decodedId.toLowerCase() },
         ],
       },
-      { $set: { isSuspended: body.isSuspended } },
+      { $set: updateFields },
       { new: true }
     ).lean();
 
@@ -209,8 +245,12 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      isSuspended: Boolean(updatedUser.isSuspended),
-      message: `Merchant status updated to ${updatedUser.isSuspended ? "Suspended" : "Active"}`,
+      merchant: {
+        id: updatedUser._id,
+        isSuspended: Boolean(updatedUser.isSuspended),
+        verification: updatedUser.verification,
+      },
+      message: "Merchant record updated successfully",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error";

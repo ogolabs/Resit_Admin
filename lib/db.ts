@@ -150,6 +150,42 @@ const ShipmentSchema = new Schema<IShipmentDoc>(
   { timestamps: true, strict: false }
 );
 
+export interface IMerchantVerification {
+  status: "unverified" | "pending" | "verified" | "rejected";
+  cacNumber?: string | null;
+  registrationNumber?: string | null;
+  countryCode?: string | null;
+  companyType?: string | null;
+  registeredName?: string | null;
+  registrationDate?: string | null;
+  tinNumber?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  verifiedAt?: Date | null;
+  provider?: string | null;
+  rejectionReason?: string | null;
+  cacDocumentUrl?: string | null;
+  cacDocumentType?: string | null;
+  documentUrl?: string | null;
+  documentType?: string | null;
+  tinDocumentUrl?: string | null;
+  taxOffice?: string | null;
+}
+
+export interface IBankDetails {
+  bankName?: string;
+  accountNumber?: string;
+  accountName?: string;
+  bankCode?: string;
+  swiftCode?: string | null;
+  iban?: string | null;
+  routingNumber?: string | null;
+  accountType?: "checking" | "savings" | string | null;
+  isVerified?: boolean;
+  verifiedAt?: Date | null;
+}
+
 export interface IUserDoc {
   _id: string;
   eoaAddress?: string;
@@ -167,6 +203,11 @@ export interface IUserDoc {
   subscriptionActive?: boolean;
   isSuspended?: boolean;
   businessAddress?: string;
+  taxId?: string | null;
+  isEmailVerified?: boolean;
+  isPhoneVerified?: boolean;
+  verification?: IMerchantVerification | null;
+  bankDetails?: IBankDetails | null;
   createdAt: Date;
 }
 
@@ -188,6 +229,11 @@ const UserSchema = new Schema<IUserDoc>(
     subscriptionActive: { type: Boolean, default: false },
     isSuspended: { type: Boolean, default: false },
     businessAddress: { type: String, default: null },
+    taxId: { type: String, default: null },
+    isEmailVerified: { type: Boolean, default: false },
+    isPhoneVerified: { type: Boolean, default: false },
+    verification: { type: Schema.Types.Mixed, default: null },
+    bankDetails: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );

@@ -33,6 +33,13 @@ interface MerchantItem {
   operatingMode: string;
   subscriptionActive: boolean;
   isSuspended: boolean;
+  verificationStatus?: "unverified" | "pending" | "verified" | "rejected";
+  verificationTier?: 0 | 1 | 2 | 3;
+  isBankVerified?: boolean;
+  isBusinessVerified?: boolean;
+  isTaxVerified?: boolean;
+  registrationNumber?: string | null;
+  taxId?: string | null;
   branchCount: number;
   teamCount: number;
   receiptCount: number;
@@ -50,6 +57,7 @@ interface MerchantsResponse {
   summary?: {
     totalActive: number;
     totalSuspended: number;
+    totalVerified?: number;
     totalBranches: number;
   };
 }
@@ -58,14 +66,16 @@ export default function MerchantsPage() {
   const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended">("all");
+  const [verificationFilter, setVerificationFilter] = useState<"all" | "verified" | "pending" | "unverified">("all");
   const [page, setPage] = useState(1);
 
   const { data, isLoading, isFetching, refetch } = useQuery<MerchantsResponse>({
-    queryKey: ["admin-merchants", searchTerm, statusFilter, page],
+    queryKey: ["admin-merchants", searchTerm, statusFilter, verificationFilter, page],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (searchTerm) params.set("q", searchTerm);
       if (statusFilter !== "all") params.set("status", statusFilter);
+      if (verificationFilter !== "all") params.set("verification", verificationFilter);
       params.set("page", page.toString());
       params.set("limit", "15");
 
@@ -93,7 +103,7 @@ export default function MerchantsPage() {
   // Aggregate high-level stats from backend global summary with fallback to view
   const activeCount = data?.summary?.totalActive ?? merchants.filter((m) => !m.isSuspended).length;
   const suspendedCount = data?.summary?.totalSuspended ?? merchants.filter((m) => m.isSuspended).length;
-  const totalBranches = data?.summary?.totalBranches ?? merchants.reduce((acc, m) => acc + m.branchCount, 0);
+  const verifiedCount = data?.summary?.totalVerified ?? merchants.filter((m) => (m.verificationTier ?? 0) >= 2).length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -127,6 +137,13 @@ export default function MerchantsPage() {
         </div>
 
         <div className="p-3 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+          <span className="text-[11px] font-medium text-slate-400 block mb-1">Verified Stores</span>
+          <div className="text-lg sm:text-xl font-bold text-blue-400 font-mono">
+            {isLoading ? "..." : verifiedCount}
+          </div>
+        </div>
+
+        <div className="p-3 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800">
           <span className="text-[11px] font-medium text-slate-400 block mb-1">Active Merchants</span>
           <div className="text-lg sm:text-xl font-bold text-emerald-400 font-mono">
             {isLoading ? "..." : activeCount}
@@ -139,17 +156,10 @@ export default function MerchantsPage() {
             {isLoading ? "..." : suspendedCount}
           </div>
         </div>
-
-        <div className="p-3 sm:p-4 rounded-xl bg-slate-900/60 border border-slate-800">
-          <span className="text-[11px] font-medium text-slate-400 block mb-1">Total Branches (Page)</span>
-          <div className="text-lg sm:text-xl font-bold text-blue-400 font-mono">
-            {isLoading ? "..." : totalBranches}
-          </div>
-        </div>
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between bg-slate-900/40 p-3 rounded-xl border border-slate-800">
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between bg-slate-900/40 p-3 rounded-xl border border-slate-800">
         <form onSubmit={handleSearchSubmit} className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -167,23 +177,44 @@ export default function MerchantsPage() {
           </button>
         </form>
 
-        <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-lg border border-slate-800 self-start sm:self-auto">
-          {(["all", "active", "suspended"] as const).map((s) => (
-            <button
-              key={s}
-              onClick={() => {
-                setStatusFilter(s);
-                setPage(1);
-              }}
-              className={`px-3 py-1 rounded text-xs font-medium capitalize transition-colors ${
-                statusFilter === s
-                  ? "bg-blue-600 text-white"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800"
-              }`}
-            >
-              {s}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+            {(["all", "active", "suspended"] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => {
+                  setStatusFilter(s);
+                  setPage(1);
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors cursor-pointer ${
+                  statusFilter === s
+                    ? "bg-blue-600 text-white"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800">
+            {(["all", "verified", "pending", "unverified"] as const).map((v) => (
+              <button
+                key={v}
+                onClick={() => {
+                  setVerificationFilter(v);
+                  setPage(1);
+                }}
+                className={`px-2.5 py-1 rounded text-xs font-medium capitalize transition-colors cursor-pointer ${
+                  verificationFilter === v
+                    ? "bg-slate-700 text-white"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -209,6 +240,7 @@ export default function MerchantsPage() {
                 <tr className="border-b border-slate-800 bg-slate-900/80 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
                   <th className="py-3 px-4">Merchant & Profile</th>
                   <th className="py-3 px-4">Wallet Identity</th>
+                  <th className="py-3 px-4">Compliance / KYB</th>
                   <th className="py-3 px-4">Branches & Staff</th>
                   <th className="py-3 px-4">Ledger Sales (GMV)</th>
                   <th className="py-3 px-4">Status</th>
@@ -225,18 +257,55 @@ export default function MerchantsPage() {
                         {merchant.businessEmail && (
                           <>
                             <span className="text-slate-600">•</span>
-                            <span className="truncate max-w-[160px]">{merchant.businessEmail}</span>
+                            <span className="truncate max-w-40">{merchant.businessEmail}</span>
                           </>
                         )}
                       </div>
                     </td>
 
                     <td className="py-3.5 px-4 font-mono text-[11px] text-slate-300">
-                      <div className="truncate max-w-[140px]" title={merchant.merchantAddress}>
+                      <div className="truncate max-w-35" title={merchant.merchantAddress}>
                         {merchant.merchantAddress}
                       </div>
                       <div className="text-[10px] text-slate-500 capitalize mt-0.5">
                         Plan: {merchant.plan || "free"}
+                      </div>
+                    </td>
+
+                    <td className="py-3.5 px-4">
+                      <div className="flex flex-col gap-1 items-start">
+                        {merchant.verificationTier === 3 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+                            <ShieldCheck className="w-3 h-3" />
+                            Tier 3 Verified
+                          </span>
+                        ) : merchant.verificationTier === 2 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/60">
+                            <ShieldCheck className="w-3 h-3" />
+                            Tier 2 Verified
+                          </span>
+                        ) : merchant.verificationTier === 1 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
+                            <ShieldCheck className="w-3 h-3" />
+                            Tier 1 (Bank)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                            Unverified
+                          </span>
+                        )}
+
+                        {merchant.registrationNumber && (
+                          <span className="font-mono text-[10px] text-slate-400 truncate max-w-30">
+                            {merchant.registrationNumber}
+                          </span>
+                        )}
+                        {merchant.verificationStatus === "pending" && (
+                          <span className="text-[10px] text-sky-400 font-medium">Under Review</span>
+                        )}
+                        {merchant.verificationStatus === "rejected" && (
+                          <span className="text-[10px] text-rose-400 font-medium">Rejected</span>
+                        )}
                       </div>
                     </td>
 

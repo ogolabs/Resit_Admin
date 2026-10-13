@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const q = (searchParams.get("q") || "").trim();
     const status = searchParams.get("status") || "all";
+    const verificationFilter = searchParams.get("verification") || "all";
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const skip = (page - 1) * limit;
@@ -27,9 +28,27 @@ export async function GET(req: NextRequest) {
       baseFilter.isSuspended = true;
     }
 
+    if (verificationFilter === "verified") {
+      baseFilter["verification.status"] = "verified";
+    } else if (verificationFilter === "pending") {
+      baseFilter["verification.status"] = "pending";
+    } else if (verificationFilter === "unverified") {
+      baseFilter.$and = [
+        ...((baseFilter.$and as Array<Record<string, unknown>>) || []),
+        {
+          $or: [
+            { "verification.status": "unverified" },
+            { "verification.status": { $exists: false } },
+            { verification: null },
+          ],
+        },
+      ];
+    }
+
     if (q) {
       const regex = new RegExp(q, "i");
       baseFilter.$and = [
+        ...((baseFilter.$and as Array<Record<string, unknown>>) || []),
         {
           $or: [
             { companyName: regex },
@@ -43,13 +62,16 @@ export async function GET(req: NextRequest) {
       ];
     }
 
-    const [total, totalActive, totalSuspended, totalBranches, userDocs] = await Promise.all([
+    const [total, totalActive, totalSuspended, totalVerified, totalBranches, userDocs] = await Promise.all([
       AdminUser.countDocuments(baseFilter),
       AdminUser.countDocuments({ role: "merchant", isSuspended: { $ne: true } }),
       AdminUser.countDocuments({ role: "merchant", isSuspended: true }),
+      AdminUser.countDocuments({ role: "merchant", "verification.status": "verified" }),
       AdminBranch.countDocuments(),
       AdminUser.find(baseFilter)
-        .select("_id eoaAddress fullName companyName businessEmail businessPhone businessHandle country currency plan operatingMode subscriptionActive isSuspended createdAt")
+        .select(
+          "_id eoaAddress fullName companyName businessEmail businessPhone businessHandle country currency plan operatingMode subscriptionActive isSuspended taxId isEmailVerified isPhoneVerified verification bankDetails createdAt"
+        )
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -112,6 +134,23 @@ export async function GET(req: NextRequest) {
       const addr = (u.eoaAddress || u._id || "").toLowerCase();
       const rStats = receiptMap.get(addr) || { totalReceipts: 0, totalGmv: 0, voidedReceipts: 0 };
 
+      const isBankVerified = Boolean(
+        u.bankDetails?.isVerified ||
+        (u.bankDetails?.accountNumber && u.country !== "NG") ||
+        (u.bankDetails?.iban && u.country !== "NG")
+      );
+      const isBusinessVerified = u.verification?.status === "verified";
+      const isTaxVerified = Boolean(u.taxId || u.verification?.tinNumber);
+
+      let verificationTier: 0 | 1 | 2 | 3 = 0;
+      if (isBusinessVerified && isTaxVerified) {
+        verificationTier = 3;
+      } else if (isBusinessVerified) {
+        verificationTier = 2;
+      } else if (isBankVerified) {
+        verificationTier = 1;
+      }
+
       return {
         id: u._id,
         merchantAddress: addr,
@@ -126,6 +165,13 @@ export async function GET(req: NextRequest) {
         operatingMode: u.operatingMode || "hybrid",
         subscriptionActive: Boolean(u.subscriptionActive),
         isSuspended: Boolean(u.isSuspended),
+        verificationStatus: u.verification?.status || "unverified",
+        verificationTier,
+        isBankVerified,
+        isBusinessVerified,
+        isTaxVerified,
+        registrationNumber: u.verification?.registrationNumber || u.verification?.cacNumber || null,
+        taxId: u.taxId || u.verification?.tinNumber || null,
         branchCount: branchMap.get(addr) || 0,
         teamCount: teamMap.get(addr) || 0,
         receiptCount: rStats.totalReceipts,
@@ -144,6 +190,7 @@ export async function GET(req: NextRequest) {
       summary: {
         totalActive,
         totalSuspended,
+        totalVerified,
         totalBranches,
       },
     });
