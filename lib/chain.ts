@@ -1,5 +1,7 @@
 import { createPublicClient, http, formatEther, defineChain, type Address } from "viem";
 
+const ankrKey = process.env.ANKR_API_KEY ? `/${process.env.ANKR_API_KEY}` : "";
+
 export const electroneumMainnet = defineChain({
   id: 52014,
   name: "Electroneum",
@@ -8,7 +10,8 @@ export const electroneumMainnet = defineChain({
     default: {
       http: [
         "https://rpc.electroneum.com",
-        `https://rpc.ankr.com/electroneum/${process.env.ANKR_API_KEY}`,
+        `https://rpc.ankr.com/electroneum${ankrKey}`,
+        "https://rpc.ankr.com/electroneum",
       ],
     },
   },
@@ -27,7 +30,9 @@ export const electroneumTestnet = defineChain({
   rpcUrls: {
     default: {
       http: [
-        `https://rpc.ankr.com/electroneum_testnet/${process.env.ANKR_API_KEY}`,
+        `https://rpc.ankr.com/electroneum_testnet${ankrKey}`,
+        "https://rpc.ankr.com/electroneum_testnet",
+        "https://rpc.ankr.com/electroneum",
       ],
     },
   },

@@ -118,6 +118,7 @@ export async function GET(
         taxId: user.taxId || null,
         isEmailVerified: Boolean(user.isEmailVerified),
         isPhoneVerified: Boolean(user.isPhoneVerified),
+        authProvider: user.authProvider || null,
         verification: user.verification || null,
         bankDetails: user.bankDetails || null,
         createdAt: user.createdAt,

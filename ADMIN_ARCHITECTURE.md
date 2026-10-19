@@ -106,8 +106,8 @@ Provides deep operational diagnostics for the underlying databases, blockchain r
   - SMS delivery rate, verification OTP completion ratios, carrier error codes, and account balance.
 - **ZeptoMail**:
   - Staff invitation email delivery rate, bounce notifications, and delivery latency.
-- **Web3Auth**:
-  - Authentication success rates across social, email OTP, and SMS login channels.
+- **Google Identity & Passwordless Gateways**:
+  - Authentication completion rates across Google One-Tap/OAuth, Email OTP, and Phone OTP channels.
 
 ---
 
@@ -200,7 +200,7 @@ Admin access is strictly gated with multiple defensive layers:
 ```
 
 1. **Isolated Authentication Flow**:
-   - Admins authenticate via a dedicated email OTP or passkey flow completely separate from merchant Web3Auth.
+   - Admins authenticate via a dedicated email OTP or passkey flow completely separate from merchant passwordless authentication.
    - Authorized admin emails must exist in the environment whitelist (`ADMIN_EMAILS="ops@resit.co,cto@resit.co"`).
 2. **Stateless Encrypted Sessions**:
    - Generates an HTTP-only, secure, same-site `admin_session` cookie signed with `ADMIN_SESSION_SECRET` (strict 8-hour expiry).
