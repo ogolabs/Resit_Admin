@@ -44,6 +44,7 @@ interface MerchantDetailResponse {
     taxId?: string | null;
     isEmailVerified?: boolean;
     isPhoneVerified?: boolean;
+    authProvider?: string | null;
     verification?: IMerchantVerification | null;
     bankDetails?: IBankDetails | null;
     createdAt: string;
@@ -347,6 +348,9 @@ export default function MerchantDetailPage() {
           </div>
           <div className="text-[11px] text-slate-400">
             Country: {merchant.country} • Currency: {merchant.currency}
+            {merchant.authProvider && (
+              <span> • Auth: <span className="capitalize text-slate-200">{merchant.authProvider}</span></span>
+            )}
           </div>
         </div>
       </div>

@@ -33,11 +33,16 @@ export async function POST() {
       : "http://localhost:3000";
 
     let reconcilerReport = null;
+    const cronSecret = process.env.CRON_SECRET;
+    const requestHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(cronSecret ? { Authorization: `Bearer ${cronSecret}` } : {}),
+    };
 
     try {
       const internalRes = await fetch(`${primaryUrl}/api/v1/relayer/reconcile?limit=25`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: requestHeaders,
         signal: AbortSignal.timeout(15_000),
       });
       if (internalRes.ok) {
@@ -48,7 +53,7 @@ export async function POST() {
         try {
           const fallbackRes = await fetch(`${fallbackUrl}/api/v1/relayer/reconcile?limit=25`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: requestHeaders,
             signal: AbortSignal.timeout(15_000),
           });
           if (fallbackRes.ok) {

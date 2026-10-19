@@ -208,6 +208,7 @@ export interface IUserDoc {
   isPhoneVerified?: boolean;
   verification?: IMerchantVerification | null;
   bankDetails?: IBankDetails | null;
+  authProvider?: string | null;
   createdAt: Date;
 }
 
@@ -221,6 +222,7 @@ const UserSchema = new Schema<IUserDoc>(
     businessEmail: { type: String, default: null },
     businessPhone: { type: String, default: null },
     businessHandle: { type: String, default: null },
+    authProvider: { type: String, default: null },
     role: { type: String, default: "user", index: true },
     country: { type: String, default: null },
     currency: { type: String, default: null },
