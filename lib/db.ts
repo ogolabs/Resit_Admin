@@ -152,38 +152,16 @@ const ShipmentSchema = new Schema<IShipmentDoc>(
 
 export interface IMerchantVerification {
   status: "unverified" | "pending" | "verified" | "rejected";
-  cacNumber?: string | null;
-  registrationNumber?: string | null;
-  countryCode?: string | null;
-  companyType?: string | null;
-  registeredName?: string | null;
-  registrationDate?: string | null;
-  tinNumber?: string | null;
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  verifiedAt?: Date | null;
-  provider?: string | null;
-  rejectionReason?: string | null;
-  cacDocumentUrl?: string | null;
-  cacDocumentType?: string | null;
-  documentUrl?: string | null;
+  provider?: "didit" | string | null;
+  sessionId?: string | null;
+  verifiedAt?: Date | string | null;
   documentType?: string | null;
-  tinDocumentUrl?: string | null;
-  taxOffice?: string | null;
-}
-
-export interface IBankDetails {
-  bankName?: string;
-  accountNumber?: string;
-  accountName?: string;
-  bankCode?: string;
-  swiftCode?: string | null;
-  iban?: string | null;
-  routingNumber?: string | null;
-  accountType?: "checking" | "savings" | string | null;
-  isVerified?: boolean;
-  verifiedAt?: Date | null;
+  fullName?: string | null;
+  documentNumberMasked?: string | null;
+  issuingCountry?: string | null;
+  expirationDate?: string | null;
+  dateOfBirth?: string | null;
+  rejectionReason?: string | null;
 }
 
 export interface IUserDoc {
@@ -203,11 +181,9 @@ export interface IUserDoc {
   subscriptionActive?: boolean;
   isSuspended?: boolean;
   businessAddress?: string;
-  taxId?: string | null;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
   verification?: IMerchantVerification | null;
-  bankDetails?: IBankDetails | null;
   authProvider?: string | null;
   createdAt: Date;
 }
@@ -231,11 +207,9 @@ const UserSchema = new Schema<IUserDoc>(
     subscriptionActive: { type: Boolean, default: false },
     isSuspended: { type: Boolean, default: false },
     businessAddress: { type: String, default: null },
-    taxId: { type: String, default: null },
     isEmailVerified: { type: Boolean, default: false },
     isPhoneVerified: { type: Boolean, default: false },
     verification: { type: Schema.Types.Mixed, default: null },
-    bankDetails: { type: Schema.Types.Mixed, default: null },
   },
   { timestamps: true }
 );

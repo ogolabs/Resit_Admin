@@ -7,7 +7,8 @@ interface DailyItem {
   label: string;
   receiptsCount: number;
   shipmentsCount: number;
-  gmvNgn: number;
+  gmvUsd: number;
+  gmvNgn?: number;
 }
 
 interface ActivityVolumeChartProps {
@@ -76,8 +77,8 @@ export function ActivityVolumeChart({ data = [], isLoading = false }: ActivityVo
                     <div className="absolute -top-12 z-20 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity bg-slate-950 border border-slate-800 rounded-lg p-2 shadow-xl text-[10px] sm:text-[11px] whitespace-nowrap space-y-0.5">
                       <div className="font-semibold text-slate-200">{day.label}</div>
                       <div className="text-blue-400 font-mono">
-                        {day.receiptsCount} {day.receiptsCount === 1 ? "receipt" : "receipts"} (₦
-                        {day.gmvNgn.toLocaleString()})
+                        {day.receiptsCount} {day.receiptsCount === 1 ? "receipt" : "receipts"} ($
+                        {day.gmvUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                       </div>
                       <div className="text-indigo-400 font-mono">
                         {day.shipmentsCount} {day.shipmentsCount === 1 ? "dispatch" : "dispatches"}
@@ -85,7 +86,7 @@ export function ActivityVolumeChart({ data = [], isLoading = false }: ActivityVo
                     </div>
 
                     {/* Dual Bars Pair */}
-                    <div className="w-full max-w-[28px] sm:max-w-[40px] flex items-end justify-center gap-1 sm:gap-1.5 h-full">
+                    <div className="w-full max-w-7 sm:max-w-10 flex items-end justify-center gap-1 sm:gap-1.5 h-full">
                       {/* Receipts Bar */}
                       <div
                         className="flex-1 rounded-t-xs bg-blue-500/80 hover:bg-blue-400 transition-all"

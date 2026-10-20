@@ -20,9 +20,11 @@ import {
   Calendar,
   AlertOctagon,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { QUERY_TIMINGS } from "@/lib/query-config";
-import type { IMerchantVerification, IBankDetails } from "@/lib/db";
+import { formatMoney } from "@/lib/currency";
+import type { IMerchantVerification } from "@/lib/db";
 import MerchantVerificationTab from "@/components/merchants/MerchantVerificationTab";
 
 interface MerchantDetailResponse {
@@ -41,12 +43,10 @@ interface MerchantDetailResponse {
     operatingMode: string;
     subscriptionActive: boolean;
     isSuspended: boolean;
-    taxId?: string | null;
     isEmailVerified?: boolean;
     isPhoneVerified?: boolean;
     authProvider?: string | null;
     verification?: IMerchantVerification | null;
-    bankDetails?: IBankDetails | null;
     createdAt: string;
   };
   stats: {
@@ -173,23 +173,10 @@ export default function MerchantDetailPage() {
   const { merchant, stats, branches, teamMembers, recentReceipts, recentShipments } = data;
   const isSuspended = merchant.isSuspended;
 
-  const isBankVerified = Boolean(
-    merchant.bankDetails?.isVerified ||
-    (merchant.bankDetails?.accountNumber && merchant.country !== "NG") ||
-    (merchant.bankDetails?.iban && merchant.country !== "NG")
-  );
-  const isBusinessVerified = merchant.verification?.status === "verified";
-  const effectiveTaxId = merchant.taxId || merchant.verification?.tinNumber || null;
-  const isTaxVerified = Boolean(effectiveTaxId);
-
-  let currentTier = 0;
-  if (isBusinessVerified && isTaxVerified) {
-    currentTier = 3;
-  } else if (isBusinessVerified) {
-    currentTier = 2;
-  } else if (isBankVerified) {
-    currentTier = 1;
-  }
+  const verificationStatus = merchant.verification?.status || "unverified";
+  const isVerified = verificationStatus === "verified";
+  const isPending = verificationStatus === "pending";
+  const isRejected = verificationStatus === "rejected";
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -219,20 +206,20 @@ export default function MerchantDetailPage() {
               </span>
             )}
 
-            {currentTier === 3 ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
+            {isVerified ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Tier 3 Verified
+                Identity Verified
               </span>
-            ) : currentTier === 2 ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-950/80 text-blue-300 border border-blue-800/60">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Tier 2 Verified
+            ) : isPending ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-950/80 text-sky-300 border border-sky-800/60">
+                <Clock className="w-3.5 h-3.5" />
+                Under Review
               </span>
-            ) : currentTier === 1 ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                Tier 1 (Bank)
+            ) : isRejected ? (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950/80 text-rose-300 border border-rose-800/60">
+                <ShieldAlert className="w-3.5 h-3.5" />
+                KYC Rejected
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-400 border border-slate-700">
@@ -277,8 +264,7 @@ export default function MerchantDetailPage() {
         <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800">
           <span className="text-[11px] font-medium text-slate-400 block mb-1">Active GMV (Issued)</span>
           <div className="text-xl font-bold text-white font-mono">
-            {merchant.currency === "USD" ? "$" : "₦"}
-            {stats.receipts.gmv.toLocaleString()}
+            {formatMoney(stats.receipts.gmv, merchant.currency)}
           </div>
           <span className="text-[10px] text-slate-500 mt-0.5 block">
             {stats.receipts.issued} of {stats.receipts.total} receipts
@@ -293,7 +279,7 @@ export default function MerchantDetailPage() {
               : "0.0%"}
           </div>
           <span className="text-[10px] text-rose-400 mt-0.5 block">
-            {stats.receipts.voided} voided (₦{stats.receipts.voidedGmv.toLocaleString()})
+            {stats.receipts.voided} voided ({formatMoney(stats.receipts.voidedGmv, merchant.currency)})
           </span>
         </div>
 
@@ -427,9 +413,7 @@ export default function MerchantDetailPage() {
             country={merchant.country}
             isEmailVerified={merchant.isEmailVerified}
             isPhoneVerified={merchant.isPhoneVerified}
-            taxId={merchant.taxId}
             verification={merchant.verification}
-            bankDetails={merchant.bankDetails}
             onStatusUpdated={() => {
               queryClient.invalidateQueries({ queryKey: ["admin-merchant-detail", merchantId] });
               queryClient.invalidateQueries({ queryKey: ["admin-merchants"] });
@@ -549,8 +533,7 @@ export default function MerchantDetailPage() {
                     <tr key={r.id} className="hover:bg-slate-800/30">
                       <td className="py-3 px-4 font-mono font-medium text-white">{r.id}</td>
                       <td className="py-3 px-4 font-mono text-slate-200">
-                        {r.currency === "USD" ? "$" : "₦"}
-                        {r.total.toLocaleString()}
+                        {formatMoney(r.total, r.currency)}
                       </td>
                       <td className="py-3 px-4 text-slate-400">{r.paymentMethod}</td>
                       <td className="py-3 px-4">

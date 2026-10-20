@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
 import {
+  getPendingQueueReceiptFilter,
+  getPendingQueueShipmentFilter,
   getUnanchoredReceiptFilter,
   getUnanchoredShipmentFilter,
   healDriftedAnchors,
@@ -24,6 +26,8 @@ export async function GET() {
     // Run database count queries and blockchain queries concurrently
     const [
       receiptsCount,
+      pendingReceipts,
+      pendingShipments,
       unanchoredReceipts,
       shipmentsCount,
       unanchoredShipments,
@@ -32,6 +36,8 @@ export async function GET() {
       relayer,
     ] = await Promise.all([
       AdminReceipt.countDocuments(),
+      AdminReceipt.countDocuments(getPendingQueueReceiptFilter()),
+      AdminShipment.countDocuments(getPendingQueueShipmentFilter()),
       AdminReceipt.countDocuments(getUnanchoredReceiptFilter()),
       AdminShipment.countDocuments(),
       AdminShipment.countDocuments(getUnanchoredShipmentFilter()),
@@ -41,6 +47,8 @@ export async function GET() {
     ]);
 
     const mem = process.memoryUsage();
+    const totalPending = pendingReceipts + pendingShipments;
+    const totalUnanchored = unanchoredReceipts + unanchoredShipments;
 
     return NextResponse.json({
       status: "healthy",
@@ -62,9 +70,12 @@ export async function GET() {
           users: usersCount,
         },
         queueDepth: {
+          pendingReceipts,
+          pendingShipments,
+          totalPending,
           unanchoredReceipts,
           unanchoredShipments,
-          totalPending: unanchoredReceipts + unanchoredShipments,
+          totalUnanchored,
         },
       },
       relayer,

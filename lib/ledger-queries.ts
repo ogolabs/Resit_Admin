@@ -1,6 +1,31 @@
 import { AdminReceipt, AdminShipment } from "./db";
 
 /**
+ * Filter for receipts actively waiting in the relayer execution queue (onChainStatus === 'pending').
+ */
+export function getPendingQueueReceiptFilter(): Record<string, unknown> {
+  return {
+    onChainStatus: "pending",
+    $or: [
+      { onChainTxHash: null },
+      { onChainTxHash: { $exists: false } },
+      { onChainTxHash: "" },
+    ],
+  };
+}
+
+/**
+ * Filter for shipments actively waiting in the relayer execution queue (onChainStatus === 'pending').
+ */
+export function getPendingQueueShipmentFilter(): Record<string, unknown> {
+  return {
+    onChainStatus: "pending",
+    onChainTxHash: { $not: /^0x/i },
+    "events.onChainTxHash": { $not: /^0x/i },
+  };
+}
+
+/**
  * Filter for receipts that have NOT yet been anchored on the Electroneum blockchain.
  * By definition, any receipt with a valid, non-empty onChainTxHash is already recorded
  * on-chain and CANNOT match this filter.
@@ -16,7 +41,6 @@ export function getUnanchoredReceiptFilter(olderThan?: Date): Record<string, unk
 
   const statusCriteria: Record<string, unknown>[] = [
     { onChainStatus: "failed" },
-    { onChainStatus: "pending" },
     { status: { $in: ["Issued", "issued"] } },
   ];
 

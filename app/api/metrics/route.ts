@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { connectAdminDb, AdminReceipt, AdminShipment, AdminUser } from "@/lib/db";
 import { getRelayerStatus } from "@/lib/chain";
 import {
+  getPendingQueueReceiptFilter,
+  getPendingQueueShipmentFilter,
   getUnanchoredReceiptFilter,
   getUnanchoredShipmentFilter,
   healDriftedAnchors,
 } from "@/lib/ledger-queries";
+import { convertToUsd, convertUsdToNgn, formatMoney } from "@/lib/currency";
 
 const DEFAULT_CURRENCY_MAP: Record<string, string> = {
   NG: "NGN",
@@ -49,6 +52,8 @@ export async function GET() {
       merchantCount,
       shipmentCountsByStatus,
       relayerStatus,
+      pendingReceiptCount,
+      pendingShipmentCount,
       unanchoredReceiptCount,
       unanchoredShipmentCount,
       activeDisputesCount,
@@ -92,6 +97,8 @@ export async function GET() {
         },
       ]),
       getRelayerStatus(),
+      AdminReceipt.countDocuments(getPendingQueueReceiptFilter()),
+      AdminShipment.countDocuments(getPendingQueueShipmentFilter()),
       AdminReceipt.countDocuments(getUnanchoredReceiptFilter(fiveMinutesAgo)),
       AdminShipment.countDocuments(getUnanchoredShipmentFilter(fiveMinutesAgo)),
       AdminShipment.countDocuments({
@@ -100,20 +107,18 @@ export async function GET() {
           { disputeResolved: { $ne: true } },
         ],
       }),
-      AdminReceipt.aggregate<{ _id: string; count: number; gmv: number }>([
-        { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      AdminReceipt.aggregate<{ _id: { date: string; currency: string }; count: number; total: number }>([
+        { $match: { createdAt: { $gte: sevenDaysAgo }, status: { $in: ["Issued", "issued"] } } },
         {
           $group: {
-            _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-            count: { $sum: 1 },
-            gmv: {
-              $sum: {
-                $cond: [{ $in: ["$status", ["Issued", "issued"]] }, "$total", 0],
-              },
+            _id: {
+              date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+              currency: { $ifNull: ["$currency", "NGN"] },
             },
+            count: { $sum: 1 },
+            total: { $sum: "$total" },
           },
         },
-        { $sort: { _id: 1 } },
       ]),
       AdminShipment.aggregate<{ _id: string; count: number }>([
         { $match: { createdAt: { $gte: sevenDaysAgo } } },
@@ -146,24 +151,41 @@ export async function GET() {
         .lean(),
     ]);
 
-    // Format currency sums for issued receipts (Active GMV)
+    // Format currency sums for issued receipts (Active GMV normalized in USD and tracked by currency)
+    let totalGmvUsd = 0;
     let gmvNgn = 0;
-    let gmvUsd = 0;
+    const byCurrency: Record<
+      string,
+      { currency: string; total: number; formatted: string; count: number; usdValue: number }
+    > = {};
+
     for (const item of issuedSalesAgg) {
-      if (item._id === "USD") {
-        gmvUsd += item.totalGmv;
-      } else {
+      const curr = (item._id || "NGN").toUpperCase();
+      const usdVal = convertToUsd(item.totalGmv, curr);
+      totalGmvUsd += usdVal;
+
+      if (curr === "NGN") {
         gmvNgn += item.totalGmv;
       }
+
+      byCurrency[curr] = {
+        currency: curr,
+        total: item.totalGmv,
+        formatted: formatMoney(item.totalGmv, curr),
+        count: item.count,
+        usdValue: usdVal,
+      };
     }
 
     // Format currency sums for voided receipts
+    let totalVoidedUsd = 0;
     let voidedNgn = 0;
-    let voidedUsd = 0;
     for (const item of voidedSalesAgg) {
-      if (item._id === "USD") {
-        voidedUsd += item.totalVoided;
-      } else {
+      const curr = (item._id || "NGN").toUpperCase();
+      const usdVal = convertToUsd(item.totalVoided, curr);
+      totalVoidedUsd += usdVal;
+
+      if (curr === "NGN") {
         voidedNgn += item.totalVoided;
       }
     }
@@ -186,14 +208,25 @@ export async function GET() {
       }
     }
 
-    // Evaluate live incident count
+    // Evaluate live queue & incident counts
+    const pendingQueueCount = pendingReceiptCount + pendingShipmentCount;
     const unanchoredCount = unanchoredReceiptCount + unanchoredShipmentCount;
     const relayerBalanceNum = parseFloat(relayerStatus.balanceEtn || "0");
     const relayerGasIncident = relayerBalanceNum < 50 ? 1 : 0;
-    const totalActiveIncidents = unanchoredCount + activeDisputesCount + relayerGasIncident;
+    const totalActiveIncidents = pendingQueueCount + activeDisputesCount + relayerGasIncident;
 
     // Format 7-Day Continuous Time Series
-    const dailyReceiptsMap = new Map(dailyReceiptsAgg.map((r) => [r._id, r]));
+    const dailyReceiptsMap = new Map<string, { count: number; gmvUsd: number; gmvNgn: number }>();
+    for (const item of dailyReceiptsAgg) {
+      const dateStr = item._id.date;
+      const curr = item._id.currency || "NGN";
+      const existing = dailyReceiptsMap.get(dateStr) || { count: 0, gmvUsd: 0, gmvNgn: 0 };
+      const usdVal = convertToUsd(item.total, curr);
+      existing.count += item.count;
+      existing.gmvUsd += usdVal;
+      existing.gmvNgn += convertUsdToNgn(usdVal);
+      dailyReceiptsMap.set(dateStr, existing);
+    }
     const dailyShipmentsMap = new Map(dailyShipmentsAgg.map((s) => [s._id, s]));
 
     const dayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -202,6 +235,7 @@ export async function GET() {
       label: string;
       receiptsCount: number;
       shipmentsCount: number;
+      gmvUsd: number;
       gmvNgn: number;
     }> = [];
 
@@ -210,7 +244,7 @@ export async function GET() {
       const dateStr = d.toISOString().slice(0, 10);
       const dayName = dayLabels[d.getUTCDay()];
       const dayNumber = d.getUTCDate();
-      const rItem = dailyReceiptsMap.get(dateStr) || { count: 0, gmv: 0 };
+      const rItem = dailyReceiptsMap.get(dateStr) || { count: 0, gmvUsd: 0, gmvNgn: 0 };
       const sItem = dailyShipmentsMap.get(dateStr) || { count: 0 };
 
       dailyActivity.push({
@@ -218,7 +252,8 @@ export async function GET() {
         label: `${dayName} ${dayNumber}`,
         receiptsCount: rItem.count,
         shipmentsCount: sItem.count,
-        gmvNgn: rItem.gmv,
+        gmvUsd: rItem.gmvUsd,
+        gmvNgn: rItem.gmvNgn,
       });
     }
 
@@ -282,7 +317,7 @@ export async function GET() {
         rawId: r._id,
         recordType: "receipt",
         merchantName: r.merchantName || undefined,
-        detail: `${r.currency || "NGN"} ${r.total.toLocaleString()}`,
+        detail: formatMoney(r.total, r.currency),
         status: (r.status || "Issued").toLowerCase() === "voided" ? "Voided" : "Issued",
         createdAt: r.createdAt,
       });
@@ -315,22 +350,31 @@ export async function GET() {
     recentEvents.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     const topRecentEvents = recentEvents.slice(0, 5);
 
+    const totalGmvNgnEquiv = convertUsdToNgn(totalGmvUsd);
+    const totalVoidedNgnEquiv = convertUsdToNgn(totalVoidedUsd);
+
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
       gmv: {
+        usd: totalGmvUsd,
+        formattedUsd: formatMoney(totalGmvUsd, "USD"),
         ngn: gmvNgn,
-        usd: gmvUsd,
-        formattedNgn: `₦${gmvNgn.toLocaleString()}`,
-        formattedUsd: `$${gmvUsd.toLocaleString()}`,
+        formattedNgn: formatMoney(gmvNgn, "NGN"),
+        ngnEquivalent: totalGmvNgnEquiv,
+        formattedNgnEquivalent: formatMoney(totalGmvNgnEquiv, "NGN", { maximumFractionDigits: 0 }),
+        byCurrency,
+        primaryCurrency: "USD",
       },
       voided: {
         count: voidedReceiptCount,
         ratePercent: voidRatePercent.toFixed(1),
+        totalUsd: totalVoidedUsd,
+        formattedUsd: formatMoney(totalVoidedUsd, "USD"),
         totalNgn: voidedNgn,
-        totalUsd: voidedUsd,
-        formattedNgn: `₦${voidedNgn.toLocaleString()}`,
-        formattedUsd: `$${voidedUsd.toLocaleString()}`,
+        formattedNgn: formatMoney(voidedNgn, "NGN"),
+        ngnEquivalent: totalVoidedNgnEquiv,
+        formattedNgnEquivalent: formatMoney(totalVoidedNgnEquiv, "NGN", { maximumFractionDigits: 0 }),
       },
       counts: {
         totalReceipts,
@@ -342,7 +386,11 @@ export async function GET() {
         address: relayerStatus.address,
         isLowBalance: relayerStatus.isLowBalance,
         balanceEtn: relayerStatus.balanceEtn,
-        unanchoredQueue: unanchoredCount,
+        unanchoredQueue: pendingQueueCount,
+        pendingQueue: pendingQueueCount,
+        pendingReceipts: pendingReceiptCount,
+        pendingShipments: pendingShipmentCount,
+        unanchoredBacklog: unanchoredCount,
         unanchoredReceipts: unanchoredReceiptCount,
         unanchoredShipments: unanchoredShipmentCount,
         network: relayerStatus.network,
@@ -350,7 +398,9 @@ export async function GET() {
       incidents: {
         activeCount: totalActiveIncidents,
         activeDisputes: activeDisputesCount,
-        unanchoredQueue: unanchoredCount,
+        unanchoredQueue: pendingQueueCount,
+        pendingQueue: pendingQueueCount,
+        unanchoredBacklog: unanchoredCount,
         unanchoredReceipts: unanchoredReceiptCount,
         unanchoredShipments: unanchoredShipmentCount,
       },
