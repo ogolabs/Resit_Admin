@@ -13,11 +13,13 @@ import {
   ChevronRight,
   ShieldCheck,
   ShieldAlert,
+  Clock,
   ArrowRight,
   ChevronLeft,
 } from "lucide-react";
 
 import { QUERY_TIMINGS } from "@/lib/query-config";
+import { formatMoney } from "@/lib/currency";
 
 interface MerchantItem {
   id: string;
@@ -34,12 +36,10 @@ interface MerchantItem {
   subscriptionActive: boolean;
   isSuspended: boolean;
   verificationStatus?: "unverified" | "pending" | "verified" | "rejected";
-  verificationTier?: 0 | 1 | 2 | 3;
-  isBankVerified?: boolean;
-  isBusinessVerified?: boolean;
-  isTaxVerified?: boolean;
-  registrationNumber?: string | null;
-  taxId?: string | null;
+  isVerified?: boolean;
+  documentType?: string | null;
+  documentNumberMasked?: string | null;
+  verifiedAt?: string | null;
   branchCount: number;
   teamCount: number;
   receiptCount: number;
@@ -103,7 +103,7 @@ export default function MerchantsPage() {
   // Aggregate high-level stats from backend global summary with fallback to view
   const activeCount = data?.summary?.totalActive ?? merchants.filter((m) => !m.isSuspended).length;
   const suspendedCount = data?.summary?.totalSuspended ?? merchants.filter((m) => m.isSuspended).length;
-  const verifiedCount = data?.summary?.totalVerified ?? merchants.filter((m) => (m.verificationTier ?? 0) >= 2).length;
+  const verifiedCount = data?.summary?.totalVerified ?? merchants.filter((m) => m.verificationStatus === "verified" || m.isVerified).length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -274,20 +274,20 @@ export default function MerchantsPage() {
 
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-1 items-start">
-                        {merchant.verificationTier === 3 ? (
+                        {merchant.verificationStatus === "verified" || merchant.isVerified ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-800/60">
                             <ShieldCheck className="w-3 h-3" />
-                            Tier 3 Verified
+                            Verified
                           </span>
-                        ) : merchant.verificationTier === 2 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-950/80 text-blue-300 border border-blue-800/60">
-                            <ShieldCheck className="w-3 h-3" />
-                            Tier 2 Verified
+                        ) : merchant.verificationStatus === "pending" ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sky-950/80 text-sky-300 border border-sky-800/60">
+                            <Clock className="w-3 h-3" />
+                            Under Review
                           </span>
-                        ) : merchant.verificationTier === 1 ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-cyan-950/80 text-cyan-300 border border-cyan-800/60">
-                            <ShieldCheck className="w-3 h-3" />
-                            Tier 1 (Bank)
+                        ) : merchant.verificationStatus === "rejected" ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-950/80 text-rose-300 border border-rose-800/60">
+                            <ShieldAlert className="w-3 h-3" />
+                            Rejected
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
@@ -295,16 +295,10 @@ export default function MerchantsPage() {
                           </span>
                         )}
 
-                        {merchant.registrationNumber && (
+                        {merchant.documentNumberMasked && (
                           <span className="font-mono text-[10px] text-slate-400 truncate max-w-30">
-                            {merchant.registrationNumber}
+                            {merchant.documentNumberMasked}
                           </span>
-                        )}
-                        {merchant.verificationStatus === "pending" && (
-                          <span className="text-[10px] text-sky-400 font-medium">Under Review</span>
-                        )}
-                        {merchant.verificationStatus === "rejected" && (
-                          <span className="text-[10px] text-rose-400 font-medium">Rejected</span>
                         )}
                       </div>
                     </td>
@@ -324,8 +318,7 @@ export default function MerchantsPage() {
 
                     <td className="py-3.5 px-4">
                       <div className="font-mono text-white font-medium">
-                        {merchant.currency === "USD" ? "$" : "₦"}
-                        {merchant.gmv.toLocaleString()}
+                        {formatMoney(merchant.gmv, merchant.currency)}
                       </div>
                       <div className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                         <Receipt className="w-3 h-3 text-slate-500" />

@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
       AdminBranch.countDocuments(),
       AdminUser.find(baseFilter)
         .select(
-          "_id eoaAddress fullName companyName businessEmail businessPhone businessHandle country currency plan operatingMode subscriptionActive isSuspended taxId isEmailVerified isPhoneVerified verification bankDetails createdAt"
+          "_id eoaAddress fullName companyName businessEmail businessPhone businessHandle country currency plan operatingMode subscriptionActive isSuspended isEmailVerified isPhoneVerified verification createdAt"
         )
         .sort({ createdAt: -1 })
         .skip(skip)
@@ -134,22 +134,7 @@ export async function GET(req: NextRequest) {
       const addr = (u.eoaAddress || u._id || "").toLowerCase();
       const rStats = receiptMap.get(addr) || { totalReceipts: 0, totalGmv: 0, voidedReceipts: 0 };
 
-      const isBankVerified = Boolean(
-        u.bankDetails?.isVerified ||
-        (u.bankDetails?.accountNumber && u.country !== "NG") ||
-        (u.bankDetails?.iban && u.country !== "NG")
-      );
-      const isBusinessVerified = u.verification?.status === "verified";
-      const isTaxVerified = Boolean(u.taxId || u.verification?.tinNumber);
-
-      let verificationTier: 0 | 1 | 2 | 3 = 0;
-      if (isBusinessVerified && isTaxVerified) {
-        verificationTier = 3;
-      } else if (isBusinessVerified) {
-        verificationTier = 2;
-      } else if (isBankVerified) {
-        verificationTier = 1;
-      }
+      const isIdentityVerified = u.verification?.status === "verified";
 
       return {
         id: u._id,
@@ -166,12 +151,10 @@ export async function GET(req: NextRequest) {
         subscriptionActive: Boolean(u.subscriptionActive),
         isSuspended: Boolean(u.isSuspended),
         verificationStatus: u.verification?.status || "unverified",
-        verificationTier,
-        isBankVerified,
-        isBusinessVerified,
-        isTaxVerified,
-        registrationNumber: u.verification?.registrationNumber || u.verification?.cacNumber || null,
-        taxId: u.taxId || u.verification?.tinNumber || null,
+        isVerified: isIdentityVerified,
+        documentType: u.verification?.documentType || null,
+        documentNumberMasked: u.verification?.documentNumberMasked || null,
+        verifiedAt: u.verification?.verifiedAt || null,
         branchCount: branchMap.get(addr) || 0,
         teamCount: teamMap.get(addr) || 0,
         receiptCount: rStats.totalReceipts,

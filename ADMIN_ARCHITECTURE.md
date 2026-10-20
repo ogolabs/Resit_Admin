@@ -21,7 +21,7 @@ Resit operates as an npm monorepo with dedicated workspaces for specific domains
 │             └─────────────────────────┬───────────────────────────────┘                │
 │                                       ▼                                                │
 │                        SHARED CORE DATA & INFRASTRUCTURE                               │
-│         MongoDB Atlas · Electroneum Smart Chain · Paystack / Stripe · Twilio / Zepto   │
+│         MongoDB Atlas · Electroneum Smart Chain · Paystack / Stripe · Termii / Zepto   │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -67,7 +67,7 @@ The executive cockpit tracks macro-level business performance, monetization heal
   - **Subscription Plan Distribution**: Interactive breakdown of Free, Starter 500, Growth 1,000, Business 2,500, and Scale 5,000 merchants.
   - **Payment Gateway Performance**: Real-time webhook success rates and settlement health for Paystack and Stripe.
 - **Retail Sales & Platform Run-Rate**:
-  - **Global Gross Merchandise Value (GMV)**: Total value of sales transactions recorded across the entire platform.
+  - **Global Gross Merchandise Value (GMV)**: Total value of sales transactions across the entire platform, standardized and denominated in US Dollars (`$ USD`) via real-time and benchmark FX normalization, while tracking native transaction volumes in their authentic recording currencies (`NGN`, `USD`, `GBP`, `EUR`, `GHS`, `KES`, etc.).
   - **Global Net Sales**: Sales after recorded discounts and voided transactions.
   - **Transaction Velocity**: Live chart of receipts issued per minute, hour, day, and month.
 - **Logistics & Custody Overview**:
@@ -102,12 +102,14 @@ Provides deep operational diagnostics for the underlying databases, blockchain r
   - Latency and uptime monitoring across primary and fallback RPC endpoints (Official Electroneum vs. Ankr).
 
 #### 3. Third-Party Integration Telemetry
-- **Twilio**:
-  - SMS delivery rate, verification OTP completion ratios, carrier error codes, and account balance.
+- **Termii**:
+  - SMS token delivery rate, verification OTP completion ratios, carrier error codes, and account balance.
 - **ZeptoMail**:
   - Staff invitation email delivery rate, bounce notifications, and delivery latency.
 - **Google Identity & Passwordless Gateways**:
   - Authentication completion rates across Google One-Tap/OAuth, Email OTP, and Phone OTP channels.
+- **Automated Identity Network (Didit v3)**:
+  - Session initialization success rate, KYC decision pass/reject ratios, average verification completion latency, and webhook delivery status.
 
 ---
 
@@ -117,9 +119,9 @@ Tools for inspecting individual store setups, troubleshooting cashier issues, an
 
 - **Universal Merchant Directory**:
   - Search by Merchant Address (`0x...`), Store Display Name, Contact Email, Phone Number, or Business Handle (`@handle`).
-  - Filter by Country (Nigeria vs. International), Subscription Tier, Operating Mode (`sales`, `dispatch`, `hybrid`), and Account Status.
+  - Filter by Country (Nigeria vs. International), Subscription Tier, Operating Mode (`sales`, `dispatch`, `hybrid`), and Verification Status.
 - **Store Deep Inspector (`/merchants/[id]`)**:
-  - **Profile Summary**: Full business identity, logo, verified contact channels, tax IDs, and bank account details.
+  - **Profile Summary**: Full business identity, logo, verified contact channels, and automated KYC verification records (verified legal owner name, masked document number, issuing country, expiry).
   - **Branch Topology**: Configured outlets, assigned branch managers, active cashier counts, and physical addresses.
   - **Team Registry**: Roster of active and suspended team members, assigned roles (Branch Manager vs. Sales Rep), invitation dates, and last login timestamps.
   - **Quota & Billing Snapshot**: Real-time counter of `operationsThisMonth` vs. `baseLimit`, rollover quota, and pending overage fees.
@@ -189,7 +191,7 @@ Admin access is strictly gated with multiple defensive layers:
                             ▼
               ┌───────────────────────────┐
               │ 3. Encrypted HMAC Session │
-              │    (8-Hour Expiry Cookie) │
+              │    (6-Month Expiry Cookie)│
               └─────────────┬─────────────┘
                             │
                             ▼
@@ -203,7 +205,7 @@ Admin access is strictly gated with multiple defensive layers:
    - Admins authenticate via a dedicated email OTP or passkey flow completely separate from merchant passwordless authentication.
    - Authorized admin emails must exist in the environment whitelist (`ADMIN_EMAILS="ops@resit.co,cto@resit.co"`).
 2. **Stateless Encrypted Sessions**:
-   - Generates an HTTP-only, secure, same-site `admin_session` cookie signed with `ADMIN_SESSION_SECRET` (strict 8-hour expiry).
+   - Generates an HTTP-only, secure, same-site `admin_session` cookie signed with `ADMIN_SESSION_SECRET` (strict 6-month lease life: 180 days = 15,552,000s).
 3. **Immutable Admin Audit Logging**:
    - Any state-altering action performed by an administrator (quota reset, store suspension, relayer sweep) writes an immutable record to the `admin_audit_logs` collection:
      ```ts
@@ -254,7 +256,7 @@ Adheres strictly to the fintech-grade design standards defined in `BRANDING.md` 
   - MongoDB connection pool stats, collection counts, and query latency gauges.
   - Relayer ETN balance monitor, nonce sync status, and unanchored queue gauge.
   - Autonomous reconciler trigger button and execution history log.
-  - Twilio, ZeptoMail, Paystack, and Stripe service status cards.
+  - Termii, ZeptoMail, Paystack, and Stripe service status cards.
 
 ### Phase 3: Universal Merchant & Records Directory
 - Build `/merchants`: Searchable merchant catalog with deep store inspector (branches, staff, quota usage, overrides).

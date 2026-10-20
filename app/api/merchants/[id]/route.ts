@@ -115,12 +115,10 @@ export async function GET(
         operatingMode: user.operatingMode || "hybrid",
         subscriptionActive: Boolean(user.subscriptionActive),
         isSuspended: Boolean(user.isSuspended),
-        taxId: user.taxId || null,
         isEmailVerified: Boolean(user.isEmailVerified),
         isPhoneVerified: Boolean(user.isPhoneVerified),
         authProvider: user.authProvider || null,
         verification: user.verification || null,
-        bankDetails: user.bankDetails || null,
         createdAt: user.createdAt,
       },
       stats: {

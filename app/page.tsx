@@ -29,10 +29,17 @@ interface MetricsResponse {
   success: boolean;
   timestamp: string;
   gmv: {
-    ngn: number;
     usd: number;
-    formattedNgn: string;
     formattedUsd: string;
+    ngn: number;
+    formattedNgn: string;
+    ngnEquivalent?: number;
+    formattedNgnEquivalent?: string;
+    byCurrency?: Record<
+      string,
+      { currency: string; total: number; formatted: string; count: number; usdValue: number }
+    >;
+    primaryCurrency: string;
   };
   voided: {
     count: number;
@@ -72,6 +79,7 @@ interface MetricsResponse {
     label: string;
     receiptsCount: number;
     shipmentsCount: number;
+    gmvUsd: number;
     gmvNgn: number;
   }>;
   countryDistribution: Array<{
@@ -117,13 +125,20 @@ export default function AdminDashboardPage() {
     (data?.custody.Disputed || 0);
 
   // Sparkline data sequences strictly derived from actual database records
-  const gmvSparkline = data?.dailyActivity?.map((d) => d.gmvNgn) || [];
+  const gmvSparkline = data?.dailyActivity?.map((d) => d.gmvUsd || 0) || [];
   const receiptsSparkline = data?.dailyActivity?.map((d) => d.receiptsCount) || [];
   const shipmentsSparkline = data?.dailyActivity?.map((d) => d.shipmentsCount) || [];
 
-  const weeklyGmvNgn = data?.dailyActivity?.reduce((acc, d) => acc + d.gmvNgn, 0) || 0;
+  const weeklyGmvUsd = data?.dailyActivity?.reduce((acc, d) => acc + (d.gmvUsd || 0), 0) || 0;
   const isMainnet = data?.relayer?.network === "mainnet";
   const networkLabel = isMainnet ? "ETN Mainnet" : "ETN Testnet";
+
+  const currencyBreakdown = Object.values(data?.gmv.byCurrency || {})
+    .filter((c) => c.total > 0)
+    .sort((a, b) => b.usdValue - a.usdValue);
+  const gmvSubValue = data?.gmv.formattedNgnEquivalent
+    ? `≈ ${data.gmv.formattedNgnEquivalent} NGN`
+    : undefined;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 px-1 sm:px-0">
@@ -188,9 +203,10 @@ export default function AdminDashboardPage() {
         {/* Card 1: Active GMV */}
         <MetricSparklineCard
           title="Active GMV (Sales)"
-          value={data?.gmv.formattedNgn || "₦0"}
-          subValue={data?.gmv.formattedUsd !== "$0" ? data?.gmv.formattedUsd : undefined}
-          badgeText={`₦${weeklyGmvNgn.toLocaleString()} 7-day throughput`}
+          value={data?.gmv.formattedUsd || "$0.00"}
+          subValue={gmvSubValue}
+          currencyBreakdown={currencyBreakdown}
+          badgeText={`$${weeklyGmvUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })} 7-day throughput`}
           badgeType="positive"
           icon={Activity}
           iconColor="text-blue-400"
@@ -314,7 +330,7 @@ export default function AdminDashboardPage() {
                 {(data?.incidents.activeCount || 0) === 0 ? "All Systems Green" : `${data?.incidents.activeCount} Active Signals`}
               </div>
               <div className="text-[11px] text-slate-400 font-mono truncate">
-                {data?.relayer.unanchoredQueue || 0} Pending queue
+                {data?.relayer.unanchoredQueue || 0} Pending in flight
               </div>
             </div>
           </div>
@@ -388,7 +404,7 @@ export default function AdminDashboardPage() {
           </span>
         </div>
         <div className="font-mono text-[11px] text-slate-500 shrink-0">
-          Operator Session Active &bull; 8-Hour Lease Life
+          Operator Session Active &bull; 6-Month Lease Life
         </div>
       </Card>
     </div>

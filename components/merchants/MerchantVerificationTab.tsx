@@ -5,29 +5,44 @@ import {
   ShieldCheck,
   ShieldAlert,
   Clock,
-  Building,
-  CreditCard,
-  FileText,
-  Eye,
   CheckCircle2,
   XCircle,
   Mail,
   Phone,
   RefreshCw,
+  Fingerprint,
+  User,
 } from "lucide-react";
-import type { IMerchantVerification, IBankDetails } from "@/lib/db";
-import DocumentPreviewModal from "@/components/ui/DocumentPreviewModal";
-import { SAMPLE_REGISTRATION_PDF } from "@/lib/sample-doc";
+import type { IMerchantVerification } from "@/lib/db";
 
 interface MerchantVerificationTabProps {
   merchantId: string;
   country: string;
   isEmailVerified?: boolean;
   isPhoneVerified?: boolean;
-  taxId?: string | null;
   verification?: IMerchantVerification | null;
-  bankDetails?: IBankDetails | null;
   onStatusUpdated?: () => void;
+}
+
+function formatDocType(type?: string | null): string {
+  if (!type) return "Identity Document";
+  switch (type.toLowerCase()) {
+    case "national_id":
+    case "id_card":
+      return "National Identity Card";
+    case "passport":
+      return "International Passport";
+    case "driving_license":
+    case "driver_license":
+      return "Driver's License";
+    case "residence_permit":
+      return "Residence Permit";
+    default:
+      return type
+        .split("_")
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(" ");
+  }
 }
 
 export default function MerchantVerificationTab({
@@ -35,38 +50,18 @@ export default function MerchantVerificationTab({
   country,
   isEmailVerified,
   isPhoneVerified,
-  taxId,
   verification,
-  bankDetails,
   onStatusUpdated,
 }: MerchantVerificationTabProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
   const status = verification?.status || "unverified";
-  const isBankVerified = Boolean(
-    bankDetails?.isVerified ||
-    (bankDetails?.accountNumber && country !== "NG") ||
-    (bankDetails?.iban && country !== "NG")
-  );
-  const isBusinessVerified = status === "verified";
-  const effectiveTaxId = taxId || verification?.tinNumber || null;
-  const isTaxVerified = Boolean(effectiveTaxId);
-
-  let currentTier = 0;
-  if (isBusinessVerified && isTaxVerified) {
-    currentTier = 3;
-  } else if (isBusinessVerified) {
-    currentTier = 2;
-  } else if (isBankVerified) {
-    currentTier = 1;
-  }
-
-  const documentUrl = verification?.documentUrl || verification?.cacDocumentUrl || null;
-  const documentType = verification?.documentType || verification?.cacDocumentType || "Registration Document";
+  const isVerified = status === "verified";
+  const isPending = status === "pending";
+  const isRejected = status === "rejected";
 
   const handleUpdateStatus = async (
     targetStatus: "verified" | "rejected" | "unverified",
@@ -117,66 +112,86 @@ export default function MerchantVerificationTab({
           <div>
             <div className="flex items-center gap-2.5">
               <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                Compliance Level
+                Identity & Compliance
               </span>
               <span
                 className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
-                  currentTier === 3
+                  isVerified
                     ? "bg-emerald-950/80 text-emerald-300 border-emerald-800/60"
-                    : currentTier === 2
-                    ? "bg-blue-950/80 text-blue-300 border-blue-800/60"
-                    : currentTier === 1
-                    ? "bg-cyan-950/80 text-cyan-300 border-cyan-800/60"
+                    : isPending
+                    ? "bg-sky-950/80 text-sky-300 border-sky-800/60"
+                    : isRejected
+                    ? "bg-rose-950/80 text-rose-300 border-rose-800/60"
                     : "bg-slate-800 text-slate-300 border-slate-700"
                 }`}
               >
-                {currentTier > 0 ? (
+                {isVerified ? (
                   <ShieldCheck className="w-3.5 h-3.5" />
+                ) : isPending ? (
+                  <Clock className="w-3.5 h-3.5" />
+                ) : isRejected ? (
+                  <XCircle className="w-3.5 h-3.5" />
                 ) : (
                   <ShieldAlert className="w-3.5 h-3.5" />
                 )}
-                <span>{currentTier > 0 ? `Tier ${currentTier} Compliant` : "Unverified"}</span>
+                <span>
+                  {isVerified
+                    ? "Identity Verified"
+                    : isPending
+                    ? "Verification Under Review"
+                    : isRejected
+                    ? "Verification Rejected"
+                    : "Unverified Merchant"}
+                </span>
               </span>
             </div>
 
             <p className="text-xs text-slate-400 mt-1.5">
-              {currentTier === 3 && "Fully verified merchant with corporate tax registration and settlement bank account."}
-              {currentTier === 2 && "Legal entity existence verified with official corporate registry."}
-              {currentTier === 1 && "Basic store settlement account linked; awaiting business registration."}
-              {currentTier === 0 && "Merchant has not yet linked a verified settlement bank account or corporate registry."}
+              {isVerified &&
+                "Merchant identity has been authenticated via automated government document & biometric verification."}
+              {isPending &&
+                "Verification session completed and currently under compliance operator review."}
+              {isRejected &&
+                "Verification was rejected by a compliance administrator or automated risk check."}
+              {!isVerified && !isPending && !isRejected &&
+                "Merchant has not yet submitted government-issued identification for automated verification."}
             </p>
           </div>
 
           {/* Admin Moderation Actions */}
-          <div className="flex items-center gap-2 self-start sm:self-auto">
-            {status !== "verified" && (
+          <div className="flex items-center gap-2 shrink-0">
+            {!isVerified && (
               <button
+                type="button"
                 onClick={() => handleUpdateStatus("verified")}
                 disabled={isUpdating}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
               >
-                {isUpdating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                <span>Mark Verified</span>
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Approve Identity</span>
               </button>
             )}
 
-            {status !== "rejected" && (
+            {!isRejected && (
               <button
+                type="button"
                 onClick={() => setRejectModalOpen(true)}
                 disabled={isUpdating}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/60 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800/60 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <XCircle className="w-3.5 h-3.5" />
                 <span>Reject</span>
               </button>
             )}
 
-            {status !== "unverified" && (
+            {(isVerified || isRejected) && (
               <button
+                type="button"
                 onClick={() => handleUpdateStatus("unverified")}
                 disabled={isUpdating}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer"
               >
+                <RefreshCw className="w-3.5 h-3.5" />
                 <span>Reset</span>
               </button>
             )}
@@ -184,7 +199,7 @@ export default function MerchantVerificationTab({
         </div>
 
         {/* Rejection Notice if rejected */}
-        {status === "rejected" && verification?.rejectionReason && (
+        {isRejected && verification?.rejectionReason && (
           <div className="mt-4 p-3 rounded-lg bg-rose-950/40 border border-rose-800/40 text-xs text-rose-300 flex items-start gap-2">
             <XCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
             <div>
@@ -195,92 +210,28 @@ export default function MerchantVerificationTab({
         )}
       </div>
 
-      {/* 3-Tier Step Breakdown */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Tier 1 Card */}
+      {/* Main Inspection Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Card 1: Official Identity & Government Document */}
         <div
-          className={`p-4 rounded-xl border bg-slate-900 space-y-3 ${
-            isBankVerified ? "border-slate-800" : "border-slate-800/60 opacity-80"
+          className={`p-4 rounded-xl border bg-slate-900 space-y-3.5 ${
+            isVerified ? "border-slate-800" : "border-slate-800/60"
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4 text-cyan-400" />
-              <span className="text-xs font-semibold text-white">Tier 1: Settlement Bank</span>
+              <User className="w-4 h-4 text-blue-400" />
+              <span className="text-xs font-semibold text-white">Government Identity Record</span>
             </div>
-            {isBankVerified ? (
+            {isVerified ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400">
                 <CheckCircle2 className="w-3.5 h-3.5" />
-                Linked
+                Authenticated
               </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                <Clock className="w-3.5 h-3.5" />
-                Pending
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between text-slate-400">
-              <span>Institution:</span>
-              <span className="font-medium text-slate-200">{bankDetails?.bankName || "—"}</span>
-            </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Account #:</span>
-              <span className="font-mono font-medium text-slate-200">
-                {bankDetails?.accountNumber || bankDetails?.iban || "—"}
-              </span>
-            </div>
-            {bankDetails?.accountName && (
-              <div className="flex justify-between text-slate-400">
-                <span>Account Name:</span>
-                <span className="font-medium text-slate-200">{bankDetails.accountName}</span>
-              </div>
-            )}
-            {bankDetails?.swiftCode && (
-              <div className="flex justify-between text-slate-400">
-                <span>SWIFT/BIC:</span>
-                <span className="font-mono text-slate-200">{bankDetails.swiftCode}</span>
-              </div>
-            )}
-            {bankDetails?.routingNumber && (
-              <div className="flex justify-between text-slate-400">
-                <span>Routing #:</span>
-                <span className="font-mono text-slate-200">{bankDetails.routingNumber}</span>
-              </div>
-            )}
-            {bankDetails?.verifiedAt && (
-              <div className="flex justify-between text-slate-400">
-                <span>Verified At:</span>
-                <span className="text-slate-300">
-                  {new Date(bankDetails.verifiedAt).toLocaleDateString()}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tier 2 Card */}
-        <div
-          className={`p-4 rounded-xl border bg-slate-900 space-y-3 ${
-            isBusinessVerified ? "border-slate-800" : "border-slate-800/60 opacity-80"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Building className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-semibold text-white">Tier 2: Legal Existence</span>
-            </div>
-            {isBusinessVerified ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Verified
-              </span>
-            ) : status === "pending" ? (
+            ) : isPending ? (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-400">
                 <Clock className="w-3.5 h-3.5" />
-                Under Review
+                Pending
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
@@ -290,121 +241,97 @@ export default function MerchantVerificationTab({
             )}
           </div>
 
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between text-slate-400">
-              <span>Registration #:</span>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Legal Full Name:</span>
+              <span className="font-medium text-slate-200 text-right">
+                {verification?.fullName || "—"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Document Type:</span>
+              <span className="font-medium text-slate-200">
+                {formatDocType(verification?.documentType)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Document Number:</span>
               <span className="font-mono font-medium text-slate-200">
-                {verification?.registrationNumber || verification?.cacNumber || "—"}
+                {verification?.documentNumberMasked || "—"}
               </span>
             </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Legal Name:</span>
-              <span className="font-medium text-slate-200 truncate max-w-37.5" title={verification?.registeredName || undefined}>
-                {verification?.registeredName || "—"}
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Issuing Country:</span>
+              <span className="font-medium text-slate-200 uppercase">
+                {verification?.issuingCountry || country || "—"}
               </span>
             </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Entity Type:</span>
-              <span className="text-slate-200 uppercase">{verification?.companyType || "—"}</span>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Date of Birth:</span>
+              <span className="font-mono text-slate-200">
+                {verification?.dateOfBirth || "—"}
+              </span>
             </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Country:</span>
-              <span className="text-slate-200">{verification?.countryCode || country || "—"}</span>
-            </div>
-            <div className="flex justify-between text-slate-400">
-              <span>Provider:</span>
-              <span className="text-slate-300 capitalize">{verification?.provider || "Direct"}</span>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Expiration Date:</span>
+              <span className="font-mono text-slate-200">
+                {verification?.expirationDate || "—"}
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Tier 3 Card */}
+        {/* Card 2: Biometric & Session Telemetry */}
         <div
-          className={`p-4 rounded-xl border bg-slate-900 space-y-3 ${
-            isTaxVerified ? "border-slate-800" : "border-slate-800/60 opacity-80"
+          className={`p-4 rounded-xl border bg-slate-900 space-y-3.5 ${
+            isVerified ? "border-slate-800" : "border-slate-800/60"
           }`}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-emerald-400" />
-              <span className="text-xs font-semibold text-white">Tier 3: Corporate Tax</span>
+              <Fingerprint className="w-4 h-4 text-purple-400" />
+              <span className="text-xs font-semibold text-white">Verification Engine Telemetry</span>
             </div>
-            {isTaxVerified ? (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-400">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Compliant
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
-                <Clock className="w-3.5 h-3.5" />
-                Optional
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-1.5 text-xs">
-            <div className="flex justify-between text-slate-400">
-              <span>Corporate Tax ID:</span>
-              <span className="font-mono font-medium text-slate-200">
-                {effectiveTaxId || "—"}
-              </span>
-            </div>
-            {verification?.taxOffice && (
-              <div className="flex justify-between text-slate-400">
-                <span>Tax Office:</span>
-                <span className="text-slate-200">{verification.taxOffice}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-slate-400">
-              <span>Tax Category:</span>
-              <span className="text-slate-200">
-                {country === "NG" ? "FIRS Corporate TIN" : "National Tax/VAT ID"}
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Official Certificate & Document Viewer */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <FileText className="w-4 h-4 text-blue-400" />
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-              Official Registration Proof Document
-            </h3>
-          </div>
-          {documentUrl ? (
-            <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Document Attached
+            <span className="text-[10px] font-mono text-purple-400 bg-purple-950/60 px-2 py-0.5 rounded border border-purple-800/50">
+              Didit v3
             </span>
-          ) : (
-            <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
-              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400" />
-              Verified On Record
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-950/80 border border-slate-800 rounded-lg">
-          <div className="space-y-0.5 min-w-0">
-            <div className="text-xs font-semibold text-white">
-              {documentType || (country === "NG" ? "Official CAC Certificate" : "Official Registration Document")}
-            </div>
-            <div className="text-[11px] text-slate-400 truncate max-w-sm sm:max-w-md font-mono">
-              {documentUrl ? documentUrl : "Certificate record verified • Document preview available"}
-            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setPreviewModalOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors shrink-0 cursor-pointer"
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>Inspect Document</span>
-          </button>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Network Provider:</span>
+              <span className="text-slate-200 font-medium">
+                {verification?.provider
+                  ? `Automated Identity Network (${verification.provider})`
+                  : "Automated Identity Network"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Session ID:</span>
+              <span
+                className="font-mono text-slate-200 text-[11px] truncate max-w-48"
+                title={verification?.sessionId || undefined}
+              >
+                {verification?.sessionId || "—"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Audit Method:</span>
+              <span className="text-slate-300">Live Biometric & Document OCR</span>
+            </div>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Verified Timestamp:</span>
+              <span className="text-slate-200 font-mono text-[11px]">
+                {verification?.verifiedAt
+                  ? new Date(verification.verifiedAt).toLocaleString()
+                  : "—"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-slate-400">
+              <span>Data Retention:</span>
+              <span className="text-slate-300">Zero PII Storage / Masked Off-Chain</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -462,13 +389,13 @@ export default function MerchantVerificationTab({
             </div>
 
             <p className="text-xs text-slate-300">
-              Provide a clear reason for rejecting this merchant&apos;s registration. This reason will be displayed in the merchant portal to explain what corrections are needed.
+              Provide a clear reason for rejecting this merchant&apos;s identity verification. This reason will be recorded and displayed in their portal.
             </p>
 
             <textarea
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="e.g., Certificate of incorporation is unreadable or legal business name does not match corporate registry records."
+              placeholder="e.g., Identity document expired, name mismatch, or image was unreadable."
               className="w-full h-24 p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-blue-500 resize-none"
             />
 
@@ -491,15 +418,6 @@ export default function MerchantVerificationTab({
           </div>
         </div>
       )}
-
-      {/* Official Certificate Document Preview Modal */}
-      <DocumentPreviewModal
-        isOpen={previewModalOpen}
-        onClose={() => setPreviewModalOpen(false)}
-        documentUrl={documentUrl || SAMPLE_REGISTRATION_PDF}
-        title={documentType || (country === "NG" ? "Official CAC Certificate" : "Official Registration Document")}
-        fileName={`registration-${verification?.registrationNumber || verification?.cacNumber || "record"}`}
-      />
     </div>
   );
 }

@@ -95,13 +95,13 @@ export function RelayerQuotaCard({
           </div>
 
           <div className="bg-slate-950/60 border border-slate-800/60 rounded-lg p-2.5">
-            <span className="text-slate-400 block text-[10px]">Unanchored Queue</span>
+            <span className="text-slate-400 block text-[10px]">Relayer Queue</span>
             <span
               className={`font-mono font-medium mt-0.5 block ${
                 unanchoredQueue > 0 ? "text-blue-400" : "text-emerald-400"
               }`}
             >
-              {unanchoredQueue} {unanchoredQueue === 1 ? "receipt" : "receipts"}
+              {unanchoredQueue} in flight
             </span>
           </div>
 
