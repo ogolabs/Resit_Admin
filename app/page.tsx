@@ -400,7 +400,7 @@ export default function AdminDashboardPage() {
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="leading-relaxed">
-            Resit Institutional Ledger &bull; Electroneum SHA-256 Immutable Proofs &bull; Off-Chain PII Zero-Storage Policy
+            SellerPadi Institutional Ledger &bull; Electroneum SHA-256 Immutable Proofs &bull; Off-Chain PII Zero-Storage Policy
           </span>
         </div>
         <div className="font-mono text-[11px] text-slate-500 shrink-0">

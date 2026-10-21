@@ -89,7 +89,7 @@ export default function AdminLoginPage() {
             <ShieldCheck className="w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold tracking-tight text-white">Resit Mission Control</h1>
+            <h1 className="text-lg font-semibold tracking-tight text-white">SellerPadi Mission Control</h1>
             <p className="text-xs text-slate-400">Internal Platform &amp; Telemetry Suite</p>
           </div>
         </div>
@@ -128,7 +128,7 @@ export default function AdminLoginPage() {
                   id="admin-email"
                   type="email"
                   required
-                  placeholder="admin@resit.co"
+                  placeholder="admin@SellerPadi.co"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
@@ -211,7 +211,7 @@ export default function AdminLoginPage() {
 
         <div className="mt-6 pt-5 border-t border-slate-800 text-center">
           <p className="text-[11px] text-slate-500">
-            Resit Infrastructure &copy; {new Date().getFullYear()} &bull; Electroneum Production Network
+            SellerPadi Infrastructure &copy; {new Date().getFullYear()} &bull; Electroneum Production Network
           </p>
         </div>
       </div>

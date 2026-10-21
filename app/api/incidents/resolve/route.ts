@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     // Verify session
     const cookieToken = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
     const session = cookieToken ? await verifyAdminSessionToken(cookieToken) : null;
-    const adminEmail = session?.email || "admin@resit.co";
+    const adminEmail = session?.email || "admin@SellerPadi.co";
 
     const body = (await req.json()) as { entityId?: string; category?: string; notes?: string };
     const { entityId, category, notes } = body;

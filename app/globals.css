@@ -3,7 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #090D16;
+  --background: #0B1220;
   --foreground: #F8FAFC;
   --surface: #0F172A;
   --surface-border: #1E293B;
@@ -19,8 +19,8 @@
   --color-muted: var(--muted);
   
   /* Brand Tokens */
-  --color-brand-blue: #2563EB;
-  --color-brand-blue-hover: #1D4ED8;
+  --color-brand-blue: #155EEF;
+  --color-brand-blue-hover: #104EC4;
   --color-brand-emerald: #059669;
   --color-brand-emerald-hover: #047857;
   --color-brand-indigo: #4F46E5;

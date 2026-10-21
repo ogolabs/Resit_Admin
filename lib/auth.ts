@@ -1,10 +1,10 @@
 import { SignJWT, jwtVerify } from "jose";
 
-export const ADMIN_COOKIE_NAME = "resit_admin_session";
+export const ADMIN_COOKIE_NAME = "SellerPadi_admin_session";
 export const ADMIN_SESSION_DURATION_SECONDS = 180 * 24 * 60 * 60; // 6 months (~180 days = 15,552,000 seconds)
 
 function getSecretKey(): Uint8Array {
-  const secret = process.env.ADMIN_SESSION_SECRET || "resit_admin_internal_secret_key_change_in_production_min_32_chars";
+  const secret = process.env.ADMIN_SESSION_SECRET || "SellerPadi_admin_internal_secret_key_change_in_production_min_32_chars";
   return new TextEncoder().encode(secret);
 }
 

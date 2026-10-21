@@ -4,11 +4,17 @@ import { AdminShell } from "@/components/AdminShell";
 import { QueryProvider } from "@/components/QueryProvider";
 
 export const metadata: Metadata = {
-  title: "Resit Mission Control — Platform Operations & Telemetry",
+  title: "SellerPadi Mission Control — Platform Operations & Telemetry",
   description: "Internal operations, merchant supervision, and relayer monitoring suite.",
   robots: {
     index: false,
     follow: false,
+  },
+  icons: {
+    icon: [
+      { url: "/logo-icon.svg", type: "image/svg+xml" },
+      { url: "/favicon.ico", sizes: "32x32", type: "image/x-icon" },
+    ],
   },
 };
 

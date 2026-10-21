@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
@@ -12,7 +13,6 @@ import {
   LogOut,
   Menu,
   X,
-  ShieldCheck,
   Radio,
 } from "lucide-react";
 
@@ -81,11 +81,11 @@ export function AdminShell({ children }: AdminShellProps) {
       {/* Mobile Top Header */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800 sticky top-0 z-40">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white">
-            <ShieldCheck className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center p-1.5 shrink-0">
+            <Image src="/logo-icon.svg" alt="SellerPadi" width={20} height={20} className="w-full h-full object-contain" />
           </div>
           <div>
-            <span className="font-semibold text-sm tracking-tight text-white">Resit Admin</span>
+            <span className="font-semibold text-sm tracking-tight text-white">SellerPadi Admin</span>
             <span className="block text-[10px] text-slate-400">Mission Control</span>
           </div>
         </div>
@@ -107,11 +107,11 @@ export function AdminShell({ children }: AdminShellProps) {
         <div className="p-5">
           {/* Logo Brand */}
           <div className="hidden md:flex items-center gap-3 mb-6 pb-4 border-b border-slate-800">
-            <div className="w-9 h-9 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0">
-              <ShieldCheck className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center p-1.5 shrink-0">
+              <Image src="/logo-icon.svg" alt="SellerPadi" width={24} height={24} className="w-full h-full object-contain" />
             </div>
             <div className="min-w-0">
-              <h2 className="font-semibold text-sm tracking-tight text-white truncate">Resit Mission Control</h2>
+              <h2 className="font-semibold text-sm tracking-tight text-white truncate">SellerPadi Mission Control</h2>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[11px] text-slate-400">Ledger Online</span>
@@ -151,7 +151,7 @@ export function AdminShell({ children }: AdminShellProps) {
               <span className="text-[11px] font-mono text-emerald-400 font-medium">Electroneum</span>
             </div>
             <p className="text-xs text-slate-300 font-medium truncate">
-              {session?.email || "admin@resit.co"}
+              {session?.email || "admin@SellerPadi.co"}
             </p>
             <span className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">
               {session?.role || "Operator"}
